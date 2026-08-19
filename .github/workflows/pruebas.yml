@@ -15,11 +15,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Sintaxis de todos los módulos
         run: |
@@ -50,17 +50,8 @@ jobs:
         run: node -e "JSON.parse(require('fs').readFileSync('manifest.webmanifest','utf8')); console.log('manifiesto correcto')"
 
       # Salvaguarda: este repositorio es público, así que nada de credenciales
-      # ni de rutas del equipo local puede colarse en un commit.
+      # ni de rutas del equipo local puede colarse en un commit. La lógica vive
+      # en un script propio, no aquí: un escáner contiene los patrones que busca,
+      # así que escrito en línea se encontraría a sí mismo.
       - name: Sin credenciales ni rutas locales
-        run: |
-          patron='sk-ant-|ghp_|gho_|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30}|BEGIN (RSA|OPENSSH) PRIVATE KEY|/home/[a-z]+/|/Users/[a-z]+/'
-          # Se excluye este propio archivo: contiene los patrones de busqueda
-          # escritos literalmente, asi que se encontraria a si mismo y la
-          # comprobacion fallaria siempre.
-          if grep -rInE "$patron" --exclude='pruebas.yml' \
-               --include='*.js' --include='*.mjs' --include='*.html' \
-               --include='*.css' --include='*.json' --include='*.yml' --include='*.md' . ; then
-            echo "::error::Se ha encontrado algo que no debe estar en un repositorio público."
-            exit 1
-          fi
-          echo "Limpio."
+        run: herramientas/revisar-secretos.sh
