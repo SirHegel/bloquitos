@@ -6,13 +6,21 @@
 
 <!--
   Politica de seguridad de contenido.
-  'self' en todo significa: este juego solo puede cargar archivos suyos. No puede
-  pedir scripts, estilos, tipografias ni imagenes a ningun servidor externo, no
-  puede abrir conexiones de red, y no puede ser incrustado en otra pagina.
-  Como el juego no tiene ninguna dependencia externa, esta politica no le quita
+  Todo apunta a 'self': el juego solo puede cargar archivos suyos. No puede pedir
+  scripts, estilos ni tipografias a ningun servidor, y no puede abrir conexiones
+  de red. Como no tiene ninguna dependencia externa, esta politica no le quita
   nada y cierra la puerta a la inyeccion de codigo de terceros.
+
+  Se incluye tambien el esquema 'filesystem:' y 'file:' porque al abrir el juego
+  con doble clic el origen es nulo y 'self' no llega a cubrirlo. Anadirlos no
+  debilita la version publicada: un documento servido por https jamas puede
+  cargar un recurso file:, el navegador lo prohibe de todos modos.
+
+  frame-ancestors no aparece aqui a proposito: esa directiva se ignora cuando
+  llega por <meta>, asi que ponerla solo generaba un aviso en consola. El
+  encabezado real lo pone el servidor (ver .github/workflows y README).
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file: filesystem:; script-src 'self' file: filesystem:; style-src 'self' file: filesystem:; img-src 'self' data: file: filesystem:; font-src 'self' file:; connect-src 'self' file: filesystem:; media-src 'self' file:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 
 <title>Bloquitos · joyas que caen</title>
@@ -90,7 +98,15 @@
           <p class="lema">Joyas que caen, para siempre</p>
           <canvas id="muestrario" class="muestrario"></canvas>
           <button class="boton boton--grande" id="btn-jugar">Jugar</button>
+          <div class="enlaces">
+            <button class="enlace" data-abrir-datos="records">🏆 Récords</button>
+            <button class="enlace" data-abrir-datos="estadisticas">📊 Estadísticas</button>
+            <button class="enlace" data-abrir-datos="logros">⭐ Logros</button>
+          </div>
           <p class="pista">Toca para girar · desliza para mover · desliza abajo para soltar</p>
+          <p class="aviso-memoria" id="aviso-memoria">
+            Este navegador no deja guardar datos, así que el progreso se perderá al cerrar.
+          </p>
         </div>
       </section>
 
@@ -99,10 +115,14 @@
         <div class="pantalla__caja">
           <h2 class="pantalla__titulo">En pausa</h2>
           <button class="boton" id="btn-reanudar">Seguir jugando</button>
+          <div class="enlaces">
+            <button class="enlace" data-abrir-datos="records">🏆 Récords</button>
+            <button class="enlace" data-abrir-datos="estadisticas">📊 Estadísticas</button>
+          </div>
         </div>
       </section>
 
-      <!-- Fin -->
+      <!-- Fin de partida -->
       <section class="pantalla" id="fin">
         <div class="pantalla__caja">
           <h2 class="pantalla__titulo" id="fin-titulo">¡Buen intento!</h2>
@@ -110,9 +130,31 @@
             <div class="resumen__fila"><span>Puntos</span><strong id="fin-puntos">0</strong></div>
             <div class="resumen__fila"><span>Líneas</span><strong id="fin-lineas">0</strong></div>
             <div class="resumen__fila"><span>Nivel</span><strong id="fin-nivel">0</strong></div>
+            <div class="resumen__fila"><span>Tiempo</span><strong id="fin-tiempo">0s</strong></div>
             <div class="resumen__fila resumen__fila--record"><span>Récord</span><strong id="fin-record">0</strong></div>
           </div>
+          <div class="caja-logros" id="fin-logros"></div>
           <button class="boton boton--grande" id="btn-reintentar">Otra vez</button>
+          <div class="enlaces">
+            <button class="enlace" data-abrir-datos="records">🏆 Récords</button>
+            <button class="enlace" data-abrir-datos="logros">⭐ Logros</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Récords, estadísticas y logros -->
+      <section class="pantalla pantalla--datos" id="datos">
+        <div class="pantalla__caja pantalla__caja--ancha">
+          <div class="pestanas">
+            <button class="pestana pestana--activa" data-pestana="records">Récords</button>
+            <button class="pestana" data-pestana="estadisticas">Datos</button>
+            <button class="pestana" data-pestana="logros">Logros</button>
+          </div>
+          <div class="datos-cuerpo" id="datos-cuerpo"></div>
+          <div class="datos-pie">
+            <button class="boton" id="btn-cerrar-datos">Volver</button>
+            <button class="enlace enlace--tenue" id="btn-borrar">Borrar todo el progreso</button>
+          </div>
         </div>
       </section>
     </div>
@@ -145,6 +187,11 @@
   <button class="mando__btn" data-accion="reserva" aria-label="Guardar pieza">⇄</button>
 </div>
 
-<script type="module" src="./js/main.js"></script>
+<!--
+  Script clasico, NO modulo. Los modulos ES estan bloqueados por CORS cuando la
+  pagina se abre con doble clic (file://), y entonces no se ejecutaria nada.
+  Este archivo lo genera "node herramientas/construir.mjs" a partir de js/*.js.
+-->
+<script src="./js/bloquitos.js" defer></script>
 </body>
 </html>

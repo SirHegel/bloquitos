@@ -1,5 +1,6 @@
 /**
- * main.js — Union de todas las piezas: lienzo, bucle de dibujo e interfaz.
+ * main.js — Union de todas las piezas: lienzo, bucle de dibujo, interfaz y
+ * base de datos.
  */
 
 import { Juego, ESTADOS } from './juego.js';
@@ -11,8 +12,11 @@ import {
   dibujarFondo, dibujarRejilla, dibujarTablero, dibujarPiezaActiva,
   dibujarPiezaFantasma, dibujarPiezaEnCaja, Particulas,
 } from './render.js';
-import { JOYAS } from './temas.js';
-import * as almacen from './almacenamiento.js';
+import {
+  abrir, migrarDesdeLocalStorage, guardarPartida, mejoresPartidas,
+  ultimasPartidas, estadisticas, leerAjuste, guardarAjuste,
+  logrosConseguidos, revisarLogros, borrarTodo, enMemoria, LOGROS,
+} from './basedatos.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -27,18 +31,16 @@ const sonido = new Sonido();
 const entradas = crearEntradas();
 const particulas = new Particulas();
 
-let ajustes = almacen.leer();
-sonido.activo = ajustes.sonido;
+// Ajustes en memoria; se rellenan desde la base de datos al arrancar.
+const ajustes = { sonido: true, fantasma: true, record: 0 };
 
 const juego = new Juego({ sonido, alAvisar: mostrarAviso });
 
 // ── Dimensionado ────────────────────────────────────────────────────────────
-// El lienzo se redimensiona al tamano real en pixeles del dispositivo para que
-// los bordes de las joyas salgan nitidos en pantallas de alta densidad.
 
 let tamCelda = 30;
-let origenX = 0;
-let origenY = 0;
+const origenX = 0;
+const origenY = 0;
 let dpr = 1;
 
 function redimensionar() {
@@ -46,10 +48,8 @@ function redimensionar() {
   dpr = Math.min(window.devicePixelRatio || 1, 2.5);
 
   const filasVisibles = FILAS - FILAS_OCULTAS;
-  // La celda se ajusta a lo que quepa, tanto de ancho como de alto.
-  const porAncho = caja.width / COLUMNAS;
-  const porAlto = caja.height / filasVisibles;
-  tamCelda = Math.floor(Math.min(porAncho, porAlto));
+  tamCelda = Math.floor(Math.min(caja.width / COLUMNAS, caja.height / filasVisibles));
+  if (!Number.isFinite(tamCelda) || tamCelda < 4) tamCelda = 4;
 
   const anchoCss = tamCelda * COLUMNAS;
   const altoCss = tamCelda * filasVisibles;
@@ -59,15 +59,12 @@ function redimensionar() {
   lienzo.width = Math.floor(anchoCss * dpr);
   lienzo.height = Math.floor(altoCss * dpr);
 
-  origenX = 0;
-  origenY = 0;
-
-  for (const [c, cv] of [[ctxSig, lienzoSig], [ctxRes, lienzoRes]]) {
+  for (const cv of [lienzoSig, lienzoRes]) {
     const r = cv.parentElement.getBoundingClientRect();
     cv.style.width = `${r.width}px`;
     cv.style.height = `${r.height}px`;
-    cv.width = Math.floor(r.width * dpr);
-    cv.height = Math.floor(r.height * dpr);
+    cv.width = Math.max(1, Math.floor(r.width * dpr));
+    cv.height = Math.max(1, Math.floor(r.height * dpr));
   }
 }
 
@@ -81,20 +78,39 @@ const capaAvisos = $('#avisos');
 function mostrarAviso(texto, clase = 'normal') {
   const el = document.createElement('div');
   el.className = `aviso aviso--${clase}`;
-  el.textContent = texto;            // textContent, nunca innerHTML: el texto
-  capaAvisos.appendChild(el);        // nunca se interpreta como HTML.
+  el.textContent = texto;          // textContent, nunca innerHTML.
+  capaAvisos.appendChild(el);
   setTimeout(() => el.remove(), 1500);
-  // Tope defensivo por si se encadenan muchisimos avisos.
   while (capaAvisos.children.length > 6) capaAvisos.firstChild.remove();
 }
 
 // ── Interfaz ────────────────────────────────────────────────────────────────
 
+const numero = (n) => Number(n || 0).toLocaleString('es');
+
+function duracion(seg) {
+  const s = Math.max(0, Math.floor(seg));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${r}s`;
+  return `${r}s`;
+}
+
+function fechaCorta(ms) {
+  try {
+    return new Date(ms).toLocaleDateString('es', { day: 'numeric', month: 'short' });
+  } catch {
+    return '—';
+  }
+}
+
 function pintarInterfaz(inst) {
-  $('#puntos').textContent = inst.puntos.toLocaleString('es');
+  $('#puntos').textContent = numero(inst.puntos);
   $('#lineas').textContent = inst.lineas;
   $('#nivel').textContent = inst.nivel;
-  $('#record').textContent = ajustes.record.toLocaleString('es');
+  $('#record').textContent = numero(ajustes.record);
   $('#nombre-nivel').textContent = inst.nombreNivel;
 
   const cbo = $('#combo');
@@ -105,7 +121,6 @@ function pintarInterfaz(inst) {
     cbo.classList.remove('visible');
   }
 
-  // El color de acento de toda la interfaz sigue al ambiente del nivel.
   document.documentElement.style.setProperty('--acento', inst.ambiente.aurora1);
   document.documentElement.style.setProperty('--acento-2', inst.ambiente.aurora2);
 }
@@ -162,17 +177,12 @@ function dibujar(inst, t) {
   ctx.save();
   ctx.scale(dpr, dpr);
 
-  // Sacudida de pantalla al soltar piezas o completar cuatro lineas.
-  let sx = 0, sy = 0;
   if (juego.sacudida > 0) {
-    sx = (Math.random() - 0.5) * juego.sacudida;
-    sy = (Math.random() - 0.5) * juego.sacudida;
+    ctx.translate((Math.random() - 0.5) * juego.sacudida, (Math.random() - 0.5) * juego.sacudida);
   }
-  ctx.translate(sx, sy);
 
   dibujarFondo(ctx, ancho, alto, inst.ambiente, t);
   dibujarRejilla(ctx, origenX, origenY, tamCelda, inst.ambiente);
-
   dibujarTablero(ctx, juego.tablero, origenX, origenY, tamCelda, juego.filasBrillando, juego.brillo);
 
   if (juego.pieza && inst.estado === ESTADOS.JUGANDO) {
@@ -181,10 +191,7 @@ function dibujar(inst, t) {
       const d = juego.tablero.distanciaAlSuelo(p.tipo, p.giro, p.x, p.y);
       if (d > 0) dibujarPiezaFantasma(ctx, p.tipo, p.giro, p.x, p.y + d, origenX, origenY, tamCelda);
     }
-    // La pieza parpadea suavemente cuando esta a punto de fijarse.
-    const alfa = juego.tocandoSuelo
-      ? 0.72 + 0.28 * Math.cos(juego.tiempoFijado / 55)
-      : 1;
+    const alfa = juego.tocandoSuelo ? 0.72 + 0.28 * Math.cos(juego.tiempoFijado / 55) : 1;
     dibujarPiezaActiva(ctx, p.tipo, p.giro, p.x, p.y, origenX, origenY, tamCelda, alfa);
   }
 
@@ -192,20 +199,18 @@ function dibujar(inst, t) {
   ctx.restore();
 }
 
-// Al completar filas se lanzan particulas desde cada celda borrada.
+// Partículas al completar filas.
 const fijarOriginal = juego.fijar.bind(juego);
 juego.fijar = function () {
-  const antes = juego.filasBrillando.length;
   fijarOriginal();
-  if (juego.filasBrillando.length > antes || (antes === 0 && juego.filasBrillando.length > 0)) {
+  if (juego.filasBrillando.length > 0) {
     for (const fila of juego.filasBrillando) {
       for (let x = 0; x < COLUMNAS; x++) {
         const color = juego.tablero.rejilla[fila][x] || 'oro';
         particulas.estallido(
           origenX + x * tamCelda + tamCelda / 2,
           origenY + (fila - FILAS_OCULTAS) * tamCelda + tamCelda / 2,
-          color,
-          10,
+          color, 10,
         );
       }
     }
@@ -217,9 +222,10 @@ juego.fijar = function () {
 const portada = $('#portada');
 const pantallaPausa = $('#pausa');
 const pantallaFin = $('#fin');
+const pantallaDatos = $('#datos');
 
 function ocultarTodas() {
-  [portada, pantallaPausa, pantallaFin].forEach((p) => p.classList.remove('visible'));
+  [portada, pantallaPausa, pantallaFin, pantallaDatos].forEach((p) => p.classList.remove('visible'));
 }
 
 function empezarPartida() {
@@ -227,6 +233,7 @@ function empezarPartida() {
   particulas.limpiar();
   juego.comenzar();
   sonido.despertar();
+  redimensionar();
 }
 
 function alternarPausa() {
@@ -235,34 +242,232 @@ function alternarPausa() {
     pantallaPausa.classList.add('visible');
   } else if (juego.estado === ESTADOS.PAUSA) {
     juego.estado = ESTADOS.JUGANDO;
-    ultimo = performance.now();   // evita un salto de gravedad al reanudar
+    ultimo = performance.now();
     pantallaPausa.classList.remove('visible');
   }
 }
 
-// Se vigila el fin de partida para mostrar el resumen una sola vez.
-let finMostrado = false;
-setInterval(() => {
-  if (juego.estado === ESTADOS.FIN && !finMostrado) {
-    finMostrado = true;
-    const inst = juego.instantanea();
-    ajustes = almacen.registrarPartida(inst);
-    $('#fin-puntos').textContent = inst.puntos.toLocaleString('es');
-    $('#fin-lineas').textContent = inst.lineas;
-    $('#fin-nivel').textContent = inst.nivel;
-    $('#fin-record').textContent = ajustes.record.toLocaleString('es');
-    $('#fin-titulo').textContent = inst.puntos >= ajustes.record && inst.puntos > 0
-      ? '¡NUEVO RÉCORD!'
-      : '¡Buen intento!';
-    pantallaFin.classList.add('visible');
+// ── Guardado al terminar la partida ─────────────────────────────────────────
+
+let finProcesado = false;
+
+async function procesarFin() {
+  const inst = juego.instantanea();
+
+  const partida = {
+    fecha: Date.now(),
+    puntos: inst.puntos,
+    lineas: inst.lineas,
+    nivel: inst.nivel,
+    piezas: inst.piezas,
+    segundos: Math.round(inst.segundos),
+    maxCombo: inst.maxCombo,
+    maxLineasDeGolpe: inst.maxLineasDeGolpe,
+    girosT: inst.girosT,
+  };
+
+  await guardarPartida(partida);
+  const totales = await estadisticas();
+  ajustes.record = totales.record;
+
+  const nuevosLogros = await revisarLogros(partida, totales);
+
+  $('#fin-puntos').textContent = numero(partida.puntos);
+  $('#fin-lineas').textContent = partida.lineas;
+  $('#fin-nivel').textContent = partida.nivel;
+  $('#fin-record').textContent = numero(totales.record);
+  $('#fin-tiempo').textContent = duracion(partida.segundos);
+  $('#fin-titulo').textContent =
+    partida.puntos > 0 && partida.puntos >= totales.record ? '¡NUEVO RÉCORD!' : '¡Buen intento!';
+
+  // Logros recién conseguidos.
+  const caja = $('#fin-logros');
+  caja.textContent = '';
+  if (nuevosLogros.length > 0) {
+    for (const logro of nuevosLogros) {
+      const el = document.createElement('div');
+      el.className = 'logro logro--nuevo';
+      const ico = document.createElement('span');
+      ico.className = 'logro__icono';
+      ico.textContent = logro.icono;
+      const txt = document.createElement('div');
+      const t = document.createElement('strong');
+      t.textContent = logro.titulo;
+      const d = document.createElement('span');
+      d.textContent = logro.descripcion;
+      txt.append(t, d);
+      el.append(ico, txt);
+      caja.appendChild(el);
+    }
+    caja.classList.add('visible');
+  } else {
+    caja.classList.remove('visible');
   }
-  if (juego.estado !== ESTADOS.FIN) finMostrado = false;
+
+  pantallaFin.classList.add('visible');
+}
+
+setInterval(() => {
+  if (juego.estado === ESTADOS.FIN && !finProcesado) {
+    finProcesado = true;
+    procesarFin().catch(() => {
+      // Si la base de datos falla, se muestra el resumen igualmente.
+      pantallaFin.classList.add('visible');
+    });
+  }
+  if (juego.estado !== ESTADOS.FIN) finProcesado = false;
 }, 150);
+
+// ── Pantalla de datos: récords, estadísticas y logros ───────────────────────
+
+async function abrirDatos(pestana = 'records') {
+  ocultarTodas();
+  pantallaDatos.classList.add('visible');
+  await pintarPestana(pestana);
+
+  for (const btn of document.querySelectorAll('[data-pestana]')) {
+    btn.classList.toggle('pestana--activa', btn.dataset.pestana === pestana);
+  }
+}
+
+async function pintarPestana(pestana) {
+  const cuerpo = $('#datos-cuerpo');
+  cuerpo.textContent = '';
+
+  if (pestana === 'records') {
+    const mejores = await mejoresPartidas(10);
+    if (mejores.length === 0) {
+      cuerpo.appendChild(vacio('Aún no hay partidas. ¡Juega una!'));
+      return;
+    }
+    const lista = document.createElement('ol');
+    lista.className = 'tabla-records';
+    mejores.forEach((p, i) => {
+      const li = document.createElement('li');
+      li.className = 'fila-record';
+      if (i === 0) li.classList.add('fila-record--primera');
+
+      const pos = document.createElement('span');
+      pos.className = 'fila-record__pos';
+      pos.textContent = ['🥇', '🥈', '🥉'][i] || String(i + 1);
+
+      const pts = document.createElement('strong');
+      pts.className = 'fila-record__puntos';
+      pts.textContent = numero(p.puntos);
+
+      const det = document.createElement('span');
+      det.className = 'fila-record__detalle';
+      det.textContent = `nivel ${p.nivel} · ${p.lineas} líneas · ${fechaCorta(p.fecha)}`;
+
+      li.append(pos, pts, det);
+      lista.appendChild(li);
+    });
+    cuerpo.appendChild(lista);
+    return;
+  }
+
+  if (pestana === 'estadisticas') {
+    const e = await estadisticas();
+    const recientes = await ultimasPartidas(12);
+
+    if (e.partidas === 0) {
+      cuerpo.appendChild(vacio('Aún no hay estadísticas. ¡Juega una partida!'));
+      return;
+    }
+
+    const rejilla = document.createElement('div');
+    rejilla.className = 'rejilla-datos';
+    const filas = [
+      ['Partidas', numero(e.partidas)],
+      ['Mejor puntuación', numero(e.record)],
+      ['Media por partida', numero(e.mediaPuntos)],
+      ['Líneas totales', numero(e.lineasTotales)],
+      ['Nivel más alto', numero(e.nivelMaximo)],
+      ['Mejor combo', `×${e.mejorCombo}`],
+      ['Piezas colocadas', numero(e.piezasTotales)],
+      ['Tiempo jugado', duracion(e.tiempoTotal)],
+    ];
+    for (const [etiqueta, valor] of filas) {
+      const celda = document.createElement('div');
+      celda.className = 'celda-dato';
+      const v = document.createElement('strong');
+      v.textContent = valor;
+      const t = document.createElement('span');
+      t.textContent = etiqueta;
+      celda.append(v, t);
+      rejilla.appendChild(celda);
+    }
+    cuerpo.appendChild(rejilla);
+
+    // Gráfico sencillo de las últimas partidas.
+    if (recientes.length > 1) {
+      const titulo = document.createElement('h3');
+      titulo.className = 'sub-titulo';
+      titulo.textContent = 'Últimas partidas';
+      cuerpo.appendChild(titulo);
+
+      const grafico = document.createElement('div');
+      grafico.className = 'grafico';
+      const maximo = Math.max(...recientes.map((p) => p.puntos), 1);
+      [...recientes].reverse().forEach((p) => {
+        const barra = document.createElement('div');
+        barra.className = 'grafico__barra';
+        barra.style.height = `${Math.max(4, (p.puntos / maximo) * 100)}%`;
+        barra.title = `${numero(p.puntos)} puntos`;
+        grafico.appendChild(barra);
+      });
+      cuerpo.appendChild(grafico);
+    }
+    return;
+  }
+
+  if (pestana === 'logros') {
+    const conseguidos = new Set((await logrosConseguidos()).map((l) => l.id));
+    const lista = document.createElement('div');
+    lista.className = 'lista-logros';
+
+    const cabecera = document.createElement('p');
+    cabecera.className = 'contador-logros';
+    cabecera.textContent = `${conseguidos.size} de ${LOGROS.length} conseguidos`;
+    cuerpo.appendChild(cabecera);
+
+    for (const logro of LOGROS) {
+      const tengo = conseguidos.has(logro.id);
+      const el = document.createElement('div');
+      el.className = tengo ? 'logro' : 'logro logro--bloqueado';
+
+      const ico = document.createElement('span');
+      ico.className = 'logro__icono';
+      ico.textContent = tengo ? logro.icono : '🔒';
+
+      const txt = document.createElement('div');
+      const t = document.createElement('strong');
+      t.textContent = logro.titulo;
+      const d = document.createElement('span');
+      d.textContent = logro.descripcion;
+      txt.append(t, d);
+
+      el.append(ico, txt);
+      lista.appendChild(el);
+    }
+    cuerpo.appendChild(lista);
+  }
+}
+
+function vacio(texto) {
+  const p = document.createElement('p');
+  p.className = 'vacio';
+  p.textContent = texto;
+  return p;
+}
 
 // ── Controles ───────────────────────────────────────────────────────────────
 
 const controles = new Controles(juego, entradas, {
-  alPausar: alternarPausa,
+  alPausar: () => {
+    if (pantallaDatos.classList.contains('visible')) { cerrarDatos(); return; }
+    alternarPausa();
+  },
   alReiniciar: () => {
     if (juego.estado === ESTADOS.FIN || juego.estado === ESTADOS.PORTADA) empezarPartida();
   },
@@ -272,66 +477,122 @@ const controles = new Controles(juego, entradas, {
 controles.conectarGestos(lienzo, () => tamCelda);
 controles.conectarBotones($('#mando'));
 
+function cerrarDatos() {
+  pantallaDatos.classList.remove('visible');
+  if (juego.estado === ESTADOS.PORTADA) portada.classList.add('visible');
+  else if (juego.estado === ESTADOS.FIN) pantallaFin.classList.add('visible');
+  else if (juego.estado === ESTADOS.PAUSA) pantallaPausa.classList.add('visible');
+}
+
 $('#btn-jugar').addEventListener('click', empezarPartida);
 $('#btn-reintentar').addEventListener('click', empezarPartida);
 $('#btn-reanudar').addEventListener('click', alternarPausa);
 $('#btn-pausa').addEventListener('click', alternarPausa);
+$('#btn-cerrar-datos').addEventListener('click', cerrarDatos);
 
-$('#btn-sonido').addEventListener('click', (e) => {
+for (const btn of document.querySelectorAll('[data-abrir-datos]')) {
+  btn.addEventListener('click', () => abrirDatos(btn.dataset.abrirDatos || 'records'));
+}
+for (const btn of document.querySelectorAll('[data-pestana]')) {
+  btn.addEventListener('click', () => abrirDatos(btn.dataset.pestana));
+}
+
+$('#btn-sonido').addEventListener('click', async (e) => {
   sonido.despertar();
   const activo = sonido.alternar();
   ajustes.sonido = activo;
-  almacen.guardar(ajustes);
+  await guardarAjuste('sonido', activo);
   e.currentTarget.setAttribute('aria-pressed', String(activo));
   e.currentTarget.textContent = activo ? '🔊' : '🔇';
 });
 
-$('#btn-fantasma').addEventListener('click', (e) => {
+$('#btn-fantasma').addEventListener('click', async (e) => {
   ajustes.fantasma = !ajustes.fantasma;
-  almacen.guardar(ajustes);
+  await guardarAjuste('fantasma', ajustes.fantasma);
   e.currentTarget.setAttribute('aria-pressed', String(ajustes.fantasma));
   e.currentTarget.textContent = ajustes.fantasma ? '👁' : '🚫';
 });
 
-// Si la pestana se oculta durante la partida, se pausa sola.
+$('#btn-borrar').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  // Doble confirmación: el primer clic avisa, el segundo borra.
+  if (btn.dataset.confirmando !== 'si') {
+    btn.dataset.confirmando = 'si';
+    btn.textContent = '¿Seguro? Pulsa otra vez';
+    btn.classList.add('boton--peligro');
+    setTimeout(() => {
+      btn.dataset.confirmando = 'no';
+      btn.textContent = 'Borrar todo el progreso';
+      btn.classList.remove('boton--peligro');
+    }, 4000);
+    return;
+  }
+  await borrarTodo();
+  ajustes.record = 0;
+  btn.dataset.confirmando = 'no';
+  btn.textContent = 'Borrado ✓';
+  btn.classList.remove('boton--peligro');
+  setTimeout(() => { btn.textContent = 'Borrar todo el progreso'; }, 2000);
+  await pintarPestana('records');
+});
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && juego.estado === ESTADOS.JUGANDO) alternarPausa();
 });
 
 // ── Arranque ────────────────────────────────────────────────────────────────
 
-$('#btn-sonido').textContent = ajustes.sonido ? '🔊' : '🔇';
-$('#btn-sonido').setAttribute('aria-pressed', String(ajustes.sonido));
-$('#btn-fantasma').textContent = ajustes.fantasma ? '👁' : '🚫';
-$('#btn-fantasma').setAttribute('aria-pressed', String(ajustes.fantasma));
-$('#record').textContent = ajustes.record.toLocaleString('es');
+async function arrancar() {
+  await abrir();
+  await migrarDesdeLocalStorage();
+
+  ajustes.sonido = await leerAjuste('sonido', true);
+  ajustes.fantasma = await leerAjuste('fantasma', true);
+  const totales = await estadisticas();
+  ajustes.record = totales.record;
+
+  sonido.activo = ajustes.sonido;
+  $('#btn-sonido').textContent = ajustes.sonido ? '🔊' : '🔇';
+  $('#btn-sonido').setAttribute('aria-pressed', String(ajustes.sonido));
+  $('#btn-fantasma').textContent = ajustes.fantasma ? '👁' : '🚫';
+  $('#btn-fantasma').setAttribute('aria-pressed', String(ajustes.fantasma));
+  $('#record').textContent = numero(ajustes.record);
+
+  // Si no se puede guardar nada, se dice claramente en vez de fingir que sí.
+  if (enMemoria()) {
+    const aviso = $('#aviso-memoria');
+    if (aviso) aviso.classList.add('visible');
+  }
+}
 
 // Muestrario de joyas en la portada.
-(function pintarMuestrario() {
+function pintarMuestrario() {
   const cv = $('#muestrario');
   if (!cv) return;
   const c = cv.getContext('2d');
   const d = Math.min(window.devicePixelRatio || 1, 2.5);
   const r = cv.getBoundingClientRect();
-  cv.width = r.width * d;
-  cv.height = r.height * d;
+  if (!r.width) return;
+  cv.width = Math.floor(r.width * d);
+  cv.height = Math.floor(r.height * d);
   c.scale(d, d);
   const tipos = Object.keys(PIEZAS);
   const paso = r.width / tipos.length;
-  tipos.forEach((t, i) => {
-    dibujarPiezaEnCaja(c, t, i * paso, 0, paso, r.height);
-  });
-})();
+  tipos.forEach((t, i) => dibujarPiezaEnCaja(c, t, i * paso, 0, paso, r.height));
+}
 
 redimensionar();
+pintarMuestrario();
 requestAnimationFrame(bucle);
 
-// Registro del trabajador de servicio: es lo que permite instalar el juego como
-// aplicacion y jugarlo sin conexion. Si falla, el juego sigue funcionando igual.
-if ('serviceWorker' in navigator) {
+// La base de datos se abre en segundo plano: el juego es jugable desde el
+// primer instante aunque la base tarde o falle.
+arrancar().catch(() => {});
+
+// El trabajador de servicio solo existe en http/https. Con file:// no está
+// disponible, y eso es normal: el juego funciona igual, solo que sin instalarse.
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {
-      // Sin conexion o sin permisos: no es un error que deba interrumpir el juego.
-    });
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
   });
 }

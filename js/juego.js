@@ -59,6 +59,10 @@ export class Juego {
     this.piezasColocadas = 0;
     this.tiempoInicio = 0;
     this.pieza = null;
+    // Métricas de la partida, para el historial y los logros.
+    this.maxCombo = 0;
+    this.maxLineasDeGolpe = 0;
+    this.girosT = 0;
   }
 
   comenzar() {
@@ -251,6 +255,9 @@ export class Juego {
     let base;
     let dificil = false;   // las jugadas "dificiles" encadenan bonus espalda-con-espalda
 
+    this.maxLineasDeGolpe = Math.max(this.maxLineasDeGolpe, cantidad);
+    if (tspin) this.girosT++;
+
     if (tspin) {
       base = [0, 800, 1200, 1600][cantidad] || 800;
       dificil = true;
@@ -273,6 +280,7 @@ export class Juego {
     this.espaldaConEspalda = dificil;
 
     this.combo++;
+    this.maxCombo = Math.max(this.maxCombo, this.combo);
     const bonusCombo = this.combo > 0 ? 50 * this.combo * nivelPunt : 0;
     if (this.combo >= 2) this.avisar(`COMBO ×${this.combo}`, 'normal');
 
@@ -379,6 +387,9 @@ export class Juego {
       nombreNivel: nombreAmbiente(this.nivel),
       piezas: this.piezasColocadas,
       segundos: this.tiempoInicio ? (performance.now() - this.tiempoInicio) / 1000 : 0,
+      maxCombo: this.maxCombo,
+      maxLineasDeGolpe: this.maxLineasDeGolpe,
+      girosT: this.girosT,
     };
   }
 }

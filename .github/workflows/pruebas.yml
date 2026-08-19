@@ -1,0 +1,66 @@
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    name: Pruebas y comprobaciones
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Sintaxis de todos los módulos
+        run: |
+          for f in js/*.js sw.js escritorio/*.js herramientas/*.mjs; do
+            node --check "$f" || exit 1
+            echo "  ok $f"
+          done
+
+      - name: Pruebas del motor y de la base de datos
+        run: node --test
+
+      # El paquete js/bloquitos.js está en el repositorio porque es lo que
+      # permite abrir index.html con doble clic. Si alguien cambia un módulo y
+      # olvida regenerarlo, el juego publicado se quedaría con la versión vieja.
+      # Aquí se regenera y se comprueba que no cambia nada.
+      - name: El paquete generado está al día
+        run: |
+          node herramientas/construir.mjs
+          if ! git diff --quiet -- js/bloquitos.js; then
+            echo "::error::js/bloquitos.js está desactualizado."
+            echo "Ejecuta 'node herramientas/construir.mjs' y añade el resultado al commit."
+            git diff --stat -- js/bloquitos.js
+            exit 1
+          fi
+          echo "El paquete coincide con los módulos fuente."
+
+      - name: El manifiesto es JSON válido
+        run: node -e "JSON.parse(require('fs').readFileSync('manifest.webmanifest','utf8')); console.log('manifiesto correcto')"
+
+      # Salvaguarda: este repositorio es público, así que nada de credenciales
+      # ni de rutas del equipo local puede colarse en un commit.
+      - name: Sin credenciales ni rutas locales
+        run: |
+          patron='sk-ant-|ghp_|gho_|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30}|BEGIN (RSA|OPENSSH) PRIVATE KEY|/home/[a-z]+/|/Users/[a-z]+/'
+          # Se excluye este propio archivo: contiene los patrones de busqueda
+          # escritos literalmente, asi que se encontraria a si mismo y la
+          # comprobacion fallaria siempre.
+          if grep -rInE "$patron" --exclude='pruebas.yml' \
+               --include='*.js' --include='*.mjs' --include='*.html' \
+               --include='*.css' --include='*.json' --include='*.yml' --include='*.md' . ; then
+            echo "::error::Se ha encontrado algo que no debe estar en un repositorio público."
+            exit 1
+          fi
+          echo "Limpio."

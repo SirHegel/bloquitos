@@ -24,3 +24,12 @@ package-lock.json
 # ── Salidas de pruebas locales ──
 capturas/
 *.local.*
+
+# ── Empaquetado de escritorio ──
+distribucion/
+dist/
+out/
+*.AppImage
+*.deb
+*.dmg
+*.exe

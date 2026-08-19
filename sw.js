@@ -11,22 +11,17 @@
  * trafico ajeno aunque algo lo intentara.
  */
 
-const VERSION = 'bloquitos-v1';
+const VERSION = 'bloquitos-v2';
 
+// Se cachea el paquete generado (js/bloquitos.js), que es lo que carga la
+// pagina, no los modulos sueltos de js/. Esos siguen existiendo para desarrollo
+// y para las pruebas, pero el navegador nunca los pide.
 const ARCHIVOS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './css/estilos.css',
-  './js/main.js',
-  './js/juego.js',
-  './js/tablero.js',
-  './js/piezas.js',
-  './js/render.js',
-  './js/temas.js',
-  './js/audio.js',
-  './js/controles.js',
-  './js/almacenamiento.js',
+  './js/bloquitos.js',
   './iconos/icono.svg',
   './iconos/icono-192.png',
   './iconos/icono-512.png',

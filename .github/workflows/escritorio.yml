@@ -1,0 +1,95 @@
+name: Ejecutables de escritorio
+
+# Compila la aplicación para Windows, Linux y macOS en los servidores de GitHub.
+# No hace falta instalar nada en el equipo propio: se lanza desde la web del
+# repositorio (pestaña Actions → «Ejecutables de escritorio» → Run workflow), o
+# publicando una etiqueta de versión.
+#
+#   git tag v1.1.0 && git push origin v1.1.0
+#
+# Al terminar, los instaladores quedan como artefactos descargables, y si se
+# lanzó por etiqueta, además se publican en la sección Releases.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  construir:
+    name: ${{ matrix.nombre }}
+    runs-on: ${{ matrix.so }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - so: ubuntu-latest
+            nombre: Linux (AppImage y deb)
+            comando: npm run empaquetar:linux
+          - so: windows-latest
+            nombre: Windows (instalador y portable)
+            comando: npm run empaquetar:windows
+          - so: macos-latest
+            nombre: macOS (dmg)
+            comando: npm run empaquetar:mac
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sin 'cache: npm' a proposito: esa opcion exige un package-lock.json, y
+      # aqui no se versiona ninguno. Con lock el cache ahorraria un minuto; sin
+      # el, el paso fallaria antes de empezar.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Comprobar que las pruebas pasan antes de empaquetar
+        run: node --test
+
+      - name: Empaquetar
+        run: ${{ matrix.comando }}
+        env:
+          # Sin firma de código: no hay certificados en el repositorio y no debe
+          # haberlos. Los ejecutables sin firmar muestran un aviso del sistema
+          # la primera vez, lo cual es normal y esperable.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Guardar los instaladores
+        uses: actions/upload-artifact@v4
+        with:
+          name: bloquitos-${{ runner.os }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            distribucion/*.exe
+            distribucion/*.AppImage
+            distribucion/*.deb
+            distribucion/*.dmg
+
+      - name: Publicar en Releases (solo al etiquetar)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            distribucion/*.exe
+            distribucion/*.AppImage
+            distribucion/*.deb
+            distribucion/*.dmg
+          body: |
+            Ejecutables de Bloquitos para Windows, Linux y macOS.
+
+            No están firmados digitalmente, así que la primera vez el sistema
+            puede pedir confirmación para abrirlos. Es lo normal en aplicaciones
+            sin certificado de firma, que cuesta dinero y no aporta nada a un
+            juego local que no toca la red.
+
+            También se puede jugar sin instalar nada en
+            https://sirhegel.github.io/bloquitos/

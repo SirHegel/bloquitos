@@ -1,0 +1,102 @@
+{
+  "name": "bloquitos",
+  "version": "1.1.0",
+  "description": "Juego de bloques que caen con niveles infinitos, joyas de caramelo y modo sin conexión",
+  "license": "MIT",
+  "author": "SirHegel",
+  "homepage": "https://sirhegel.github.io/bloquitos/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SirHegel/bloquitos.git"
+  },
+  "main": "escritorio/principal.js",
+  "private": true,
+  "scripts": {
+    "construir": "node herramientas/construir.mjs",
+    "probar": "node --test",
+    "servir": "node herramientas/construir.mjs && python3 -m http.server 8000",
+    "escritorio": "npm run construir && electron .",
+    "empaquetar": "npm run construir && electron-builder --publish never",
+    "empaquetar:windows": "npm run construir && electron-builder --win --publish never",
+    "empaquetar:linux": "npm run construir && electron-builder --linux --publish never",
+    "empaquetar:mac": "npm run construir && electron-builder --mac --publish never"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.sirhegel.bloquitos",
+    "productName": "Bloquitos",
+    "copyright": "Copyright (c) 2026 SirHegel",
+    "directories": {
+      "output": "distribucion",
+      "buildResources": "iconos"
+    },
+    "files": [
+      "index.html",
+      "css/**/*",
+      "js/bloquitos.js",
+      "iconos/**/*",
+      "manifest.webmanifest",
+      "escritorio/**/*",
+      "LICENSE"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "iconos/icono-512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Bloquitos"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "iconos/icono-512.png",
+      "category": "Game",
+      "synopsis": "Juego de bloques que caen con niveles infinitos"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "iconos/icono-512.png",
+      "category": "public.app-category.puzzle-games"
+    }
+  }
+}
