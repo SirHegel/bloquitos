@@ -1,0 +1,26 @@
+# ── Nunca subir: nada local ni credenciales ──
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+**/*credential*
+**/*secret*
+
+# ── Ruido del sistema y editores ──
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+*~
+.vscode/
+.idea/
+
+# ── Node, por si alguna vez se anaden herramientas de desarrollo ──
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# ── Salidas de pruebas locales ──
+capturas/
+*.local.*

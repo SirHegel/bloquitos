@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Bloquitos">
+  <title>Bloquitos</title>
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b1f4d"/>
+      <stop offset="1" stop-color="#0a0c26"/>
+    </linearGradient>
+    <radialGradient id="brumaA" cx="0.24" cy="0.18" r="0.62">
+      <stop offset="0" stop-color="#67e8f9" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#67e8f9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="brumaB" cx="0.82" cy="0.86" r="0.62">
+      <stop offset="0" stop-color="#f0abfc" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#f0abfc" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="jCian" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a5f3fc"/><stop offset="0.42" stop-color="#22d3ee"/><stop offset="1" stop-color="#0e7490"/>
+    </linearGradient>
+    <linearGradient id="jOro" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fde68a"/><stop offset="0.42" stop-color="#fbbf24"/><stop offset="1" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="jAma" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ddd6fe"/><stop offset="0.42" stop-color="#a78bfa"/><stop offset="1" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="jRub" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fecdd3"/><stop offset="0.42" stop-color="#fb7185"/><stop offset="1" stop-color="#be123c"/>
+    </linearGradient>
+    <linearGradient id="jEsm" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a7f3d0"/><stop offset="0.42" stop-color="#34d399"/><stop offset="1" stop-color="#047857"/>
+    </linearGradient>
+
+    <linearGradient id="lustre" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.04"/>
+    </linearGradient>
+
+    <filter id="sombra" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="9" stdDeviation="13" flood-color="#000" flood-opacity="0.48"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="114" fill="url(#fondo)"/>
+  <rect width="512" height="512" rx="114" fill="url(#brumaA)"/>
+  <rect width="512" height="512" rx="114" fill="url(#brumaB)"/>
+
+  <!-- Cinco joyas dispuestas como una pieza cayendo -->
+  <g filter="url(#sombra)">
+    <!-- fila superior -->
+    <g>
+      <rect x="118" y="118" width="126" height="126" rx="34" fill="url(#jCian)"/>
+      <path d="M135 227 V152 a17 17 0 0 1 17-17 h75" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="10" stroke-linecap="round"/>
+      <rect x="141" y="139" width="52" height="33" rx="16" fill="url(#lustre)"/>
+    </g>
+    <g>
+      <rect x="268" y="118" width="126" height="126" rx="34" fill="url(#jAma)"/>
+      <path d="M285 227 V152 a17 17 0 0 1 17-17 h75" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="10" stroke-linecap="round"/>
+      <rect x="291" y="139" width="52" height="33" rx="16" fill="url(#lustre)"/>
+    </g>
+    <!-- fila inferior -->
+    <g>
+      <rect x="118" y="268" width="126" height="126" rx="34" fill="url(#jRub)"/>
+      <path d="M135 377 V302 a17 17 0 0 1 17-17 h75" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="10" stroke-linecap="round"/>
+      <rect x="141" y="289" width="52" height="33" rx="16" fill="url(#lustre)"/>
+    </g>
+    <g>
+      <rect x="268" y="268" width="126" height="126" rx="34" fill="url(#jEsm)"/>
+      <path d="M285 377 V302 a17 17 0 0 1 17-17 h75" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="10" stroke-linecap="round"/>
+      <rect x="291" y="289" width="52" height="33" rx="16" fill="url(#lustre)"/>
+    </g>
+  </g>
+</svg>

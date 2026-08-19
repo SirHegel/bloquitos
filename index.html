@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+
+<!--
+  Politica de seguridad de contenido.
+  'self' en todo significa: este juego solo puede cargar archivos suyos. No puede
+  pedir scripts, estilos, tipografias ni imagenes a ningun servidor externo, no
+  puede abrir conexiones de red, y no puede ser incrustado en otra pagina.
+  Como el juego no tiene ninguna dependencia externa, esta politica no le quita
+  nada y cierra la puerta a la inyeccion de codigo de terceros.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="referrer" content="no-referrer">
+
+<title>Bloquitos · joyas que caen</title>
+<meta name="description" content="Juego de bloques que caen, con niveles infinitos y joyas de caramelo. Funciona sin conexion y se instala como aplicacion.">
+<meta name="theme-color" content="#0d1030">
+<meta name="color-scheme" content="dark">
+
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./iconos/icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./iconos/icono-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bloquitos">
+<link rel="stylesheet" href="./css/estilos.css">
+</head>
+<body>
+
+<div class="escena">
+
+  <!-- ── Panel izquierdo ─────────────────────────────────────────────── -->
+  <aside class="panel panel--izq">
+    <div class="tarjeta tarjeta--reserva">
+      <h2 class="tarjeta__titulo">Guardada</h2>
+      <div class="lienzo-caja lienzo-caja--reserva">
+        <canvas id="lienzo-reserva"></canvas>
+      </div>
+    </div>
+
+    <div class="tarjeta marcador">
+      <div class="dato">
+        <span class="dato__etiqueta">Puntos</span>
+        <span class="dato__valor dato__valor--grande" id="puntos">0</span>
+      </div>
+      <div class="dato">
+        <span class="dato__etiqueta">Récord</span>
+        <span class="dato__valor" id="record">0</span>
+      </div>
+      <div class="dato dato--fila">
+        <div>
+          <span class="dato__etiqueta">Nivel</span>
+          <span class="dato__valor" id="nivel">0</span>
+        </div>
+        <div>
+          <span class="dato__etiqueta">Líneas</span>
+          <span class="dato__valor" id="lineas">0</span>
+        </div>
+      </div>
+      <p class="nombre-nivel" id="nombre-nivel">Cristal de Azúcar</p>
+    </div>
+
+    <div class="tarjeta ayuda">
+      <h2 class="tarjeta__titulo">Teclas</h2>
+      <ul class="ayuda__lista">
+        <li><kbd>←</kbd><kbd>→</kbd> mover</li>
+        <li><kbd>↑</kbd> girar</li>
+        <li><kbd>↓</kbd> bajar</li>
+        <li><kbd>espacio</kbd> soltar</li>
+        <li><kbd>C</kbd> guardar</li>
+        <li><kbd>P</kbd> pausa</li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- ── Tablero ─────────────────────────────────────────────────────── -->
+  <main class="tablero-zona">
+    <div class="tablero-marco">
+      <canvas id="lienzo" aria-label="Tablero de juego"></canvas>
+      <div class="avisos" id="avisos" aria-live="polite"></div>
+      <div class="combo" id="combo"></div>
+
+      <!-- Portada -->
+      <section class="pantalla visible" id="portada">
+        <div class="pantalla__caja">
+          <h1 class="logo">Bloquitos</h1>
+          <p class="lema">Joyas que caen, para siempre</p>
+          <canvas id="muestrario" class="muestrario"></canvas>
+          <button class="boton boton--grande" id="btn-jugar">Jugar</button>
+          <p class="pista">Toca para girar · desliza para mover · desliza abajo para soltar</p>
+        </div>
+      </section>
+
+      <!-- Pausa -->
+      <section class="pantalla" id="pausa">
+        <div class="pantalla__caja">
+          <h2 class="pantalla__titulo">En pausa</h2>
+          <button class="boton" id="btn-reanudar">Seguir jugando</button>
+        </div>
+      </section>
+
+      <!-- Fin -->
+      <section class="pantalla" id="fin">
+        <div class="pantalla__caja">
+          <h2 class="pantalla__titulo" id="fin-titulo">¡Buen intento!</h2>
+          <div class="resumen">
+            <div class="resumen__fila"><span>Puntos</span><strong id="fin-puntos">0</strong></div>
+            <div class="resumen__fila"><span>Líneas</span><strong id="fin-lineas">0</strong></div>
+            <div class="resumen__fila"><span>Nivel</span><strong id="fin-nivel">0</strong></div>
+            <div class="resumen__fila resumen__fila--record"><span>Récord</span><strong id="fin-record">0</strong></div>
+          </div>
+          <button class="boton boton--grande" id="btn-reintentar">Otra vez</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ── Panel derecho ───────────────────────────────────────────────── -->
+  <aside class="panel panel--der">
+    <div class="tarjeta tarjeta--siguientes">
+      <h2 class="tarjeta__titulo">Siguientes</h2>
+      <div class="lienzo-caja lienzo-caja--siguientes">
+        <canvas id="lienzo-siguientes"></canvas>
+      </div>
+    </div>
+
+    <div class="tarjeta interruptores">
+      <button class="chip" id="btn-sonido" aria-pressed="true" title="Sonido">🔊</button>
+      <button class="chip" id="btn-fantasma" aria-pressed="true" title="Sombra de caída">👁</button>
+      <button class="chip" id="btn-pausa" title="Pausa">⏸</button>
+    </div>
+  </aside>
+</div>
+
+<!-- ── Mando tactil ──────────────────────────────────────────────────── -->
+<div class="mando" id="mando">
+  <button class="mando__btn" data-accion="izquierda" aria-label="Mover a la izquierda">◀</button>
+  <button class="mando__btn" data-accion="abajo" aria-label="Bajar">▼</button>
+  <button class="mando__btn" data-accion="derecha" aria-label="Mover a la derecha">▶</button>
+  <button class="mando__btn mando__btn--acento" data-accion="girar" aria-label="Girar">⟳</button>
+  <button class="mando__btn mando__btn--acento" data-accion="soltar" aria-label="Soltar">⤓</button>
+  <button class="mando__btn" data-accion="reserva" aria-label="Guardar pieza">⇄</button>
+</div>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,490 @@
+/*
+  estilos.css — Aspecto de la interfaz.
+
+  Criterio de diseno: el tablero es el unico sitio con color intenso. Todo lo que
+  lo rodea es vidrio oscuro y translucido, para que las joyas destaquen y la
+  vista no compita consigo misma. Los acentos (--acento) los cambia el propio
+  juego en cada nivel, asi que la interfaz va cambiando de tono con el ambiente.
+
+  No se carga ninguna tipografia externa: se usa la del sistema, prefiriendo la
+  variante redondeada donde exista. Eso evita una peticion de red, hace que el
+  juego arranque al instante y funcione igual sin conexion.
+*/
+
+:root {
+  --acento: #7dd3fc;
+  --acento-2: #f0abfc;
+
+  --vidrio: rgba(255, 255, 255, 0.055);
+  --vidrio-borde: rgba(255, 255, 255, 0.13);
+  --vidrio-fuerte: rgba(255, 255, 255, 0.10);
+
+  --texto: #f0f4ff;
+  --texto-tenue: rgba(240, 244, 255, 0.62);
+  --fondo: #0d1030;
+
+  --radio: 20px;
+  --radio-chico: 14px;
+
+  --fuente: ui-rounded, 'SF Pro Rounded', system-ui, -apple-system,
+            'Segoe UI Variable', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+
+  --sombra-tarjeta: 0 10px 34px rgba(0, 0, 0, 0.42);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: var(--fuente);
+  color: var(--texto);
+  background: var(--fondo);
+  /* Degradado ambiental que asoma por detras del tablero. */
+  background-image:
+    radial-gradient(1100px 700px at 12% -10%, rgba(125, 211, 252, 0.16), transparent 60%),
+    radial-gradient(900px 640px at 105% 15%, rgba(240, 171, 252, 0.14), transparent 62%),
+    radial-gradient(800px 800px at 50% 120%, rgba(52, 211, 153, 0.10), transparent 60%);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── Distribucion ──────────────────────────────────────────────────────── */
+
+.escena {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(150px, 210px) minmax(0, auto) minmax(150px, 210px);
+  gap: clamp(10px, 2vw, 26px);
+  align-items: center;
+  justify-content: center;
+  padding: clamp(10px, 2vh, 22px);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tablero-zona {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tablero-marco {
+  position: relative;
+  height: 100%;
+  aspect-ratio: 10 / 20;
+  max-height: 100%;
+  border-radius: var(--radio);
+  overflow: hidden;
+  /* Doble borde: uno claro dentro y una sombra amplia fuera. Da la sensacion de
+     que el tablero es una pieza fisica encajada en la pantalla. */
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 0 0 7px rgba(255, 255, 255, 0.045),
+    0 26px 70px rgba(0, 0, 0, 0.60),
+    0 0 90px -18px var(--acento);
+  transition: box-shadow 700ms ease;
+}
+
+#lienzo {
+  display: block;
+  border-radius: var(--radio);
+}
+
+/* ── Tarjetas de vidrio ────────────────────────────────────────────────── */
+
+.tarjeta {
+  background: var(--vidrio);
+  border: 1px solid var(--vidrio-borde);
+  border-radius: var(--radio);
+  padding: 14px;
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: var(--sombra-tarjeta);
+}
+
+.tarjeta__titulo {
+  margin: 0 0 10px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--texto-tenue);
+}
+
+.lienzo-caja { width: 100%; }
+.lienzo-caja--reserva { height: 78px; }
+.lienzo-caja--siguientes { height: 300px; }
+.lienzo-caja canvas { display: block; width: 100%; height: 100%; }
+
+/* ── Marcador ──────────────────────────────────────────────────────────── */
+
+.marcador { display: flex; flex-direction: column; gap: 12px; }
+
+.dato { display: flex; flex-direction: column; gap: 2px; }
+.dato--fila { flex-direction: row; justify-content: space-between; gap: 10px; }
+.dato--fila > div { display: flex; flex-direction: column; gap: 2px; }
+
+.dato__etiqueta {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--texto-tenue);
+}
+
+.dato__valor {
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.dato__valor--grande {
+  font-size: 2.1rem;
+  background: linear-gradient(135deg, var(--acento), var(--acento-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  transition: background 700ms ease;
+}
+
+.nombre-nivel {
+  margin: 2px 0 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--acento);
+  transition: color 700ms ease;
+}
+
+/* ── Ayuda ─────────────────────────────────────────────────────────────── */
+
+.ayuda__lista {
+  margin: 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 7px;
+  font-size: 0.73rem; color: var(--texto-tenue);
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 2px 6px;
+  margin-right: 3px;
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--texto);
+  background: var(--vidrio-fuerte);
+  border: 1px solid var(--vidrio-borde);
+  border-bottom-width: 2px;
+  border-radius: 7px;
+}
+
+/* ── Interruptores ─────────────────────────────────────────────────────── */
+
+.interruptores { display: flex; gap: 8px; justify-content: center; }
+
+.chip {
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  font-size: 1.15rem;
+  color: var(--texto);
+  background: var(--vidrio-fuerte);
+  border: 1px solid var(--vidrio-borde);
+  border-radius: var(--radio-chico);
+  cursor: pointer;
+  transition: transform 140ms ease, background 200ms ease;
+}
+.chip:hover { background: rgba(255, 255, 255, 0.16); transform: translateY(-2px); }
+.chip:active { transform: translateY(0) scale(0.94); }
+.chip[aria-pressed="false"] { opacity: 0.45; }
+
+/* ── Avisos flotantes ──────────────────────────────────────────────────── */
+
+.avisos {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.aviso {
+  font-size: clamp(1.1rem, 4vw, 1.9rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-shadow: 0 3px 20px rgba(0, 0, 0, 0.65);
+  animation: subir 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.aviso--normal   { color: #fff; }
+.aviso--especial { background: linear-gradient(120deg, #fde68a, #fb7185, #c4b5fd);
+                   -webkit-background-clip: text; background-clip: text; color: transparent; }
+.aviso--nivel    { background: linear-gradient(120deg, #67e8f9, #a7f3d0, #fde68a);
+                   -webkit-background-clip: text; background-clip: text; color: transparent;
+                   font-size: clamp(1rem, 3.4vw, 1.6rem); }
+
+@keyframes subir {
+  0%   { opacity: 0; transform: translateY(24px) scale(0.7); }
+  18%  { opacity: 1; transform: translateY(0) scale(1.12); }
+  32%  { transform: translateY(0) scale(1); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-38px) scale(0.94); }
+}
+
+.combo {
+  position: absolute;
+  top: 14px; right: 14px;
+  padding: 6px 13px;
+  font-size: 0.82rem;
+  font-weight: 900;
+  border-radius: 999px;
+  color: #1a1030;
+  background: linear-gradient(120deg, #fde68a, #fb923c);
+  box-shadow: 0 6px 20px rgba(251, 146, 60, 0.45);
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 200ms ease, transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 6;
+}
+.combo.visible { opacity: 1; transform: scale(1); }
+
+/* ── Pantallas superpuestas ────────────────────────────────────────────── */
+
+.pantalla {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(8, 10, 32, 0.80);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 280ms ease, visibility 280ms;
+  z-index: 10;
+}
+.pantalla.visible { opacity: 1; visibility: visible; }
+
+.pantalla__caja {
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo {
+  margin: 0;
+  font-size: clamp(2.2rem, 9vw, 3.1rem);
+  font-weight: 900;
+  letter-spacing: -0.028em;
+  background: linear-gradient(120deg, #67e8f9, #c4b5fd, #fda4af, #fde68a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 5px 26px rgba(196, 181, 253, 0.42));
+}
+
+.lema {
+  margin: -8px 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--texto-tenue);
+}
+
+.muestrario { width: 100%; height: 56px; }
+
+.pantalla__titulo {
+  margin: 0;
+  font-size: clamp(1.5rem, 6vw, 2rem);
+  font-weight: 900;
+  background: linear-gradient(120deg, #fde68a, #fda4af);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pista {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--texto-tenue);
+}
+
+.boton {
+  padding: 13px 30px;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #14103a;
+  background: linear-gradient(135deg, #a7f3d0, #67e8f9 45%, #c4b5fd);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 9px 26px rgba(103, 232, 249, 0.32), inset 0 -3px 0 rgba(0, 0, 0, 0.14);
+  transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease;
+}
+.boton:hover  { transform: translateY(-3px); box-shadow: 0 14px 34px rgba(103, 232, 249, 0.44); }
+.boton:active { transform: translateY(0) scale(0.96); }
+.boton--grande { padding: 16px 46px; font-size: 1.12rem; }
+
+.resumen {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--vidrio);
+  border: 1px solid var(--vidrio-borde);
+  border-radius: var(--radio-chico);
+}
+.resumen__fila {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.86rem;
+  color: var(--texto-tenue);
+}
+.resumen__fila strong {
+  color: var(--texto);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.resumen__fila--record strong {
+  background: linear-gradient(120deg, #fde68a, #fb923c);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* ── Mando tactil ──────────────────────────────────────────────────────── */
+
+.mando { display: none; }
+
+.mando__btn {
+  height: 60px;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  color: var(--texto);
+  background: var(--vidrio-fuerte);
+  border: 1px solid var(--vidrio-borde);
+  border-radius: 18px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  cursor: pointer;
+  transition: transform 90ms ease, background 140ms ease;
+}
+.mando__btn.pulsado,
+.mando__btn:active { transform: scale(0.93); background: rgba(255, 255, 255, 0.22); }
+
+.mando__btn--acento {
+  background: linear-gradient(135deg, rgba(167, 243, 208, 0.30), rgba(196, 181, 253, 0.30));
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+/* ── Pantallas medianas: se recolocan los paneles ──────────────────────── */
+
+@media (max-width: 1000px) {
+  .escena { grid-template-columns: minmax(120px, 165px) minmax(0, auto) minmax(120px, 165px); }
+  .lienzo-caja--siguientes { height: 210px; }
+  .ayuda { display: none; }
+}
+
+/* ── Movil: el tablero manda, aparece el mando tactil ──────────────────── */
+
+@media (max-width: 720px), (pointer: coarse) and (max-height: 900px) {
+  body { overflow: hidden; }
+
+  .escena {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px;
+    height: calc(100% - 168px);
+  }
+
+  /* Los dos paneles laterales se funden en una sola barra horizontal arriba. */
+  .panel--izq, .panel--der {
+    grid-row: 1;
+    grid-column: 1;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .panel--der { justify-content: flex-end; }
+
+  .panel--izq { display: grid; grid-template-columns: auto 1fr auto; }
+
+  .tarjeta { padding: 9px 11px; }
+  .tarjeta__titulo { font-size: 0.55rem; margin-bottom: 5px; }
+
+  .tarjeta--reserva { width: 78px; }
+  .lienzo-caja--reserva { height: 42px; }
+
+  .tarjeta--siguientes { display: none; }
+  .ayuda { display: none; }
+  .interruptores { display: none; }
+
+  .marcador { flex-direction: row; align-items: center; gap: 14px; }
+  .dato__valor--grande { font-size: 1.5rem; }
+  .dato__valor { font-size: 1rem; }
+  .nombre-nivel { display: none; }
+
+  .tablero-zona { grid-row: 2; }
+
+  .mando {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 9px;
+    padding: 9px 12px calc(12px + env(safe-area-inset-bottom));
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 20;
+  }
+}
+
+/* Pantallas muy bajas en horizontal: se compacta el mando. */
+@media (pointer: coarse) and (max-height: 480px) {
+  .escena { height: calc(100% - 122px); }
+  .mando__btn { height: 44px; font-size: 1.2rem; }
+}
+
+/* ── Accesibilidad ─────────────────────────────────────────────────────── */
+
+/* Quien tenga activado "reducir movimiento" no recibe animaciones de interfaz. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 3px solid var(--acento);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
