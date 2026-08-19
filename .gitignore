@@ -5,7 +5,15 @@
 *.pem
 *.key
 **/*credential*
+**/*credencial*
 **/*secret*
+**/*secreto*
+**/*contrasena*
+**/*password*
+# La red de seguridad de arriba es deliberadamente amplia, pero atrapaba
+# tambien a la herramienta que busca secretos, porque "secretos" contiene
+# "secret". Se exceptua de forma explicita: es codigo, no un archivo de datos.
+!herramientas/revisar-secretos.sh
 
 # ── Ruido del sistema y editores ──
 .DS_Store
