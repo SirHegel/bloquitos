@@ -8,7 +8,7 @@
  * material solido en vez de un cuadrito.
  */
 
-import { JOYAS } from './temas.js';
+import { JOYAS, SIMBOLOS } from './temas.js';
 import { celdas, PIEZAS } from './piezas.js';
 import { COLUMNAS, FILAS, FILAS_OCULTAS } from './tablero.js';
 
@@ -26,6 +26,100 @@ function rutaRedondeada(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, radio);
   ctx.arcTo(x, y, x + w, y, radio);
   ctx.closePath();
+}
+
+/**
+ * Estado del modo daltonico. Lo cambia la interfaz; el renderizador solo lo lee.
+ * Es un modulo con estado a proposito: pasarlo por parametro obligaria a
+ * atravesarlo por seis funciones de dibujo que no lo necesitan para nada mas.
+ */
+let modoDaltonico = false;
+
+export function activarSimbolos(activo) {
+  modoDaltonico = !!activo;
+}
+
+export function simbolosActivos() {
+  return modoDaltonico;
+}
+
+/**
+ * Graba la forma de la pieza sobre la joya.
+ *
+ * Se dibuja en dos pasadas: primero un trazo oscuro y ancho, luego uno claro y
+ * fino encima. Ese doble contorno hace que la forma se lea tanto sobre las
+ * joyas claras (oro, cian) como sobre las oscuras (zafiro, amatista), sin
+ * tener que ajustar el color a cada una.
+ */
+function dibujarSimbolo(ctx, forma, cx, cy, radio) {
+  if (!forma) return;
+
+  const trazar = () => {
+    ctx.beginPath();
+    switch (forma) {
+      case 'circulo':
+        ctx.arc(cx, cy, radio, 0, Math.PI * 2);
+        break;
+      case 'cuadrado':
+        ctx.rect(cx - radio * 0.82, cy - radio * 0.82, radio * 1.64, radio * 1.64);
+        break;
+      case 'triangulo':
+        ctx.moveTo(cx, cy - radio);
+        ctx.lineTo(cx + radio * 0.92, cy + radio * 0.72);
+        ctx.lineTo(cx - radio * 0.92, cy + radio * 0.72);
+        ctx.closePath();
+        break;
+      case 'rombo':
+        ctx.moveTo(cx, cy - radio);
+        ctx.lineTo(cx + radio, cy);
+        ctx.lineTo(cx, cy + radio);
+        ctx.lineTo(cx - radio, cy);
+        ctx.closePath();
+        break;
+      case 'cruz':
+        ctx.moveTo(cx - radio * 0.85, cy - radio * 0.85);
+        ctx.lineTo(cx + radio * 0.85, cy + radio * 0.85);
+        ctx.moveTo(cx + radio * 0.85, cy - radio * 0.85);
+        ctx.lineTo(cx - radio * 0.85, cy + radio * 0.85);
+        break;
+      case 'barra':
+        ctx.moveTo(cx - radio, cy);
+        ctx.lineTo(cx + radio, cy);
+        break;
+      case 'estrella': {
+        // Estrella de cuatro puntas: se lee bien incluso a 12 px de lado.
+        const p = radio, q = radio * 0.34;
+        ctx.moveTo(cx, cy - p);
+        ctx.lineTo(cx + q, cy - q);
+        ctx.lineTo(cx + p, cy);
+        ctx.lineTo(cx + q, cy + q);
+        ctx.lineTo(cx, cy + p);
+        ctx.lineTo(cx - q, cy + q);
+        ctx.lineTo(cx - p, cy);
+        ctx.lineTo(cx - q, cy - q);
+        ctx.closePath();
+        break;
+      }
+    }
+  };
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Pasada oscura, ancha: da contraste sobre las joyas claras.
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.lineWidth = Math.max(2.2, radio * 0.62);
+  trazar();
+  ctx.stroke();
+
+  // Pasada clara, fina: da contraste sobre las joyas oscuras.
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+  ctx.lineWidth = Math.max(1.1, radio * 0.30);
+  trazar();
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 /**
@@ -105,6 +199,12 @@ export function dibujarJoya(ctx, px, py, tam, nombreColor, alfa = 1, brillo = 0)
   ctx.globalAlpha = alfa * 0.4;
   ctx.lineWidth = Math.max(1, tam * 0.035);
   ctx.stroke();
+
+  // Simbolo del modo daltonico, grabado sobre la joya.
+  if (modoDaltonico) {
+    ctx.globalAlpha = alfa * 0.9;
+    dibujarSimbolo(ctx, SIMBOLOS[nombreColor], x + w / 2, y + h / 2, tam * 0.19);
+  }
 
   // Destello extra cuando la fila se esta completando.
   if (brillo > 0) {

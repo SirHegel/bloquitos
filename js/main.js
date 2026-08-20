@@ -10,7 +10,7 @@ import { COLUMNAS, FILAS, FILAS_OCULTAS } from './tablero.js';
 import { PIEZAS } from './piezas.js';
 import {
   dibujarFondo, dibujarRejilla, dibujarTablero, dibujarPiezaActiva,
-  dibujarPiezaFantasma, dibujarPiezaEnCaja, Particulas,
+  dibujarPiezaFantasma, dibujarPiezaEnCaja, Particulas, activarSimbolos,
 } from './render.js';
 import {
   abrir, migrarDesdeLocalStorage, guardarPartida, mejoresPartidas,
@@ -32,7 +32,7 @@ const entradas = crearEntradas();
 const particulas = new Particulas();
 
 // Ajustes en memoria; se rellenan desde la base de datos al arrancar.
-const ajustes = { sonido: true, fantasma: true, record: 0 };
+const ajustes = { sonido: true, fantasma: true, daltonico: false, record: 0 };
 
 const juego = new Juego({ sonido, alAvisar: mostrarAviso });
 
@@ -512,6 +512,15 @@ $('#btn-sonido').addEventListener('click', async (e) => {
   await guardarAjuste('sonido', activo);
 });
 
+$('#btn-daltonico').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  ajustes.daltonico = !ajustes.daltonico;
+  activarSimbolos(ajustes.daltonico);
+  btn.setAttribute('aria-pressed', String(ajustes.daltonico));
+  pintarMuestrario();   // el muestrario de la portada tambien lleva simbolos
+  await guardarAjuste('daltonico', ajustes.daltonico);
+});
+
 $('#btn-fantasma').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   ajustes.fantasma = !ajustes.fantasma;
@@ -555,6 +564,8 @@ async function arrancar() {
 
   ajustes.sonido = await leerAjuste('sonido', true);
   ajustes.fantasma = await leerAjuste('fantasma', true);
+  ajustes.daltonico = await leerAjuste('daltonico', false);
+  activarSimbolos(ajustes.daltonico);
   const totales = await estadisticas();
   ajustes.record = totales.record;
 
@@ -563,6 +574,8 @@ async function arrancar() {
   $('#btn-sonido').setAttribute('aria-pressed', String(ajustes.sonido));
   $('#btn-fantasma').textContent = ajustes.fantasma ? '👁' : '🚫';
   $('#btn-fantasma').setAttribute('aria-pressed', String(ajustes.fantasma));
+  $('#btn-daltonico').setAttribute('aria-pressed', String(ajustes.daltonico));
+  pintarMuestrario();
   $('#record').textContent = numero(ajustes.record);
 
   // Si no se puede guardar nada, se dice claramente en vez de fingir que sí.

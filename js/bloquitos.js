@@ -291,6 +291,29 @@ class Tablero {
  *    en ningun momento: niveles infinitos con atmosfera siempre distinta.
  */
 
+/**
+ * Simbolo de cada joya, para el modo daltonico.
+ *
+ * Alrededor del 8% de los ninos varones tiene alguna deficiencia en la vision
+ * del color, y la mas comun (deuteranopia) confunde justo los pares que este
+ * juego usa: verde con rojo, y naranja con verde. Un juego que distingue las
+ * piezas solo por color les resulta directamente injugable.
+ *
+ * Con el modo activado, cada joya lleva ademas una forma grabada. La forma no
+ * depende del color en absoluto, asi que las piezas se distinguen igual en
+ * blanco y negro. Se dibujan como trazos vectoriales, no como texto, para que
+ * no dependan de ninguna tipografia instalada.
+ */
+const SIMBOLOS = {
+  cian:      'circulo',
+  oro:       'cuadrado',
+  amatista:  'triangulo',
+  esmeralda: 'rombo',
+  rubi:      'cruz',
+  zafiro:    'barra',
+  ambar:     'estrella',
+};
+
 /** Las 7 joyas. Cada una define su cara, su luz y su sombra. */
 const JOYAS = {
   cian:      { base: '#22d3ee', luz: '#a5f3fc', sombra: '#0e7490', halo: '#67e8f9' },
@@ -899,6 +922,100 @@ function rutaRedondeada(ctx, x, y, w, h, r) {
 }
 
 /**
+ * Estado del modo daltonico. Lo cambia la interfaz; el renderizador solo lo lee.
+ * Es un modulo con estado a proposito: pasarlo por parametro obligaria a
+ * atravesarlo por seis funciones de dibujo que no lo necesitan para nada mas.
+ */
+let modoDaltonico = false;
+
+function activarSimbolos(activo) {
+  modoDaltonico = !!activo;
+}
+
+function simbolosActivos() {
+  return modoDaltonico;
+}
+
+/**
+ * Graba la forma de la pieza sobre la joya.
+ *
+ * Se dibuja en dos pasadas: primero un trazo oscuro y ancho, luego uno claro y
+ * fino encima. Ese doble contorno hace que la forma se lea tanto sobre las
+ * joyas claras (oro, cian) como sobre las oscuras (zafiro, amatista), sin
+ * tener que ajustar el color a cada una.
+ */
+function dibujarSimbolo(ctx, forma, cx, cy, radio) {
+  if (!forma) return;
+
+  const trazar = () => {
+    ctx.beginPath();
+    switch (forma) {
+      case 'circulo':
+        ctx.arc(cx, cy, radio, 0, Math.PI * 2);
+        break;
+      case 'cuadrado':
+        ctx.rect(cx - radio * 0.82, cy - radio * 0.82, radio * 1.64, radio * 1.64);
+        break;
+      case 'triangulo':
+        ctx.moveTo(cx, cy - radio);
+        ctx.lineTo(cx + radio * 0.92, cy + radio * 0.72);
+        ctx.lineTo(cx - radio * 0.92, cy + radio * 0.72);
+        ctx.closePath();
+        break;
+      case 'rombo':
+        ctx.moveTo(cx, cy - radio);
+        ctx.lineTo(cx + radio, cy);
+        ctx.lineTo(cx, cy + radio);
+        ctx.lineTo(cx - radio, cy);
+        ctx.closePath();
+        break;
+      case 'cruz':
+        ctx.moveTo(cx - radio * 0.85, cy - radio * 0.85);
+        ctx.lineTo(cx + radio * 0.85, cy + radio * 0.85);
+        ctx.moveTo(cx + radio * 0.85, cy - radio * 0.85);
+        ctx.lineTo(cx - radio * 0.85, cy + radio * 0.85);
+        break;
+      case 'barra':
+        ctx.moveTo(cx - radio, cy);
+        ctx.lineTo(cx + radio, cy);
+        break;
+      case 'estrella': {
+        // Estrella de cuatro puntas: se lee bien incluso a 12 px de lado.
+        const p = radio, q = radio * 0.34;
+        ctx.moveTo(cx, cy - p);
+        ctx.lineTo(cx + q, cy - q);
+        ctx.lineTo(cx + p, cy);
+        ctx.lineTo(cx + q, cy + q);
+        ctx.lineTo(cx, cy + p);
+        ctx.lineTo(cx - q, cy + q);
+        ctx.lineTo(cx - p, cy);
+        ctx.lineTo(cx - q, cy - q);
+        ctx.closePath();
+        break;
+      }
+    }
+  };
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Pasada oscura, ancha: da contraste sobre las joyas claras.
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.lineWidth = Math.max(2.2, radio * 0.62);
+  trazar();
+  ctx.stroke();
+
+  // Pasada clara, fina: da contraste sobre las joyas oscuras.
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+  ctx.lineWidth = Math.max(1.1, radio * 0.30);
+  trazar();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
  * Dibuja un bloque como joya de caramelo.
  * @param {number} alfa  1 = solido. Menor = pieza fantasma o desvaneciendose.
  * @param {number} brillo 0..1 extra de luz, se usa al completar una linea.
@@ -975,6 +1092,12 @@ function dibujarJoya(ctx, px, py, tam, nombreColor, alfa = 1, brillo = 0) {
   ctx.globalAlpha = alfa * 0.4;
   ctx.lineWidth = Math.max(1, tam * 0.035);
   ctx.stroke();
+
+  // Simbolo del modo daltonico, grabado sobre la joya.
+  if (modoDaltonico) {
+    ctx.globalAlpha = alfa * 0.9;
+    dibujarSimbolo(ctx, SIMBOLOS[nombreColor], x + w / 2, y + h / 2, tam * 0.19);
+  }
 
   // Destello extra cuando la fila se esta completando.
   if (brillo > 0) {
@@ -1786,7 +1909,7 @@ const entradas = crearEntradas();
 const particulas = new Particulas();
 
 // Ajustes en memoria; se rellenan desde la base de datos al arrancar.
-const ajustes = { sonido: true, fantasma: true, record: 0 };
+const ajustes = { sonido: true, fantasma: true, daltonico: false, record: 0 };
 
 const juego = new Juego({ sonido, alAvisar: mostrarAviso });
 
@@ -2266,6 +2389,15 @@ $('#btn-sonido').addEventListener('click', async (e) => {
   await guardarAjuste('sonido', activo);
 });
 
+$('#btn-daltonico').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  ajustes.daltonico = !ajustes.daltonico;
+  activarSimbolos(ajustes.daltonico);
+  btn.setAttribute('aria-pressed', String(ajustes.daltonico));
+  pintarMuestrario();   // el muestrario de la portada tambien lleva simbolos
+  await guardarAjuste('daltonico', ajustes.daltonico);
+});
+
 $('#btn-fantasma').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   ajustes.fantasma = !ajustes.fantasma;
@@ -2309,6 +2441,8 @@ async function arrancar() {
 
   ajustes.sonido = await leerAjuste('sonido', true);
   ajustes.fantasma = await leerAjuste('fantasma', true);
+  ajustes.daltonico = await leerAjuste('daltonico', false);
+  activarSimbolos(ajustes.daltonico);
   const totales = await estadisticas();
   ajustes.record = totales.record;
 
@@ -2317,6 +2451,8 @@ async function arrancar() {
   $('#btn-sonido').setAttribute('aria-pressed', String(ajustes.sonido));
   $('#btn-fantasma').textContent = ajustes.fantasma ? '👁' : '🚫';
   $('#btn-fantasma').setAttribute('aria-pressed', String(ajustes.fantasma));
+  $('#btn-daltonico').setAttribute('aria-pressed', String(ajustes.daltonico));
+  pintarMuestrario();
   $('#record').textContent = numero(ajustes.record);
 
   // Si no se puede guardar nada, se dice claramente en vez de fingir que sí.
