@@ -12,6 +12,29 @@
  *    en ningun momento: niveles infinitos con atmosfera siempre distinta.
  */
 
+/**
+ * Simbolo de cada joya, para el modo daltonico.
+ *
+ * Alrededor del 8% de los ninos varones tiene alguna deficiencia en la vision
+ * del color, y la mas comun (deuteranopia) confunde justo los pares que este
+ * juego usa: verde con rojo, y naranja con verde. Un juego que distingue las
+ * piezas solo por color les resulta directamente injugable.
+ *
+ * Con el modo activado, cada joya lleva ademas una forma grabada. La forma no
+ * depende del color en absoluto, asi que las piezas se distinguen igual en
+ * blanco y negro. Se dibujan como trazos vectoriales, no como texto, para que
+ * no dependan de ninguna tipografia instalada.
+ */
+export const SIMBOLOS = {
+  cian:      'circulo',
+  oro:       'cuadrado',
+  amatista:  'triangulo',
+  esmeralda: 'rombo',
+  rubi:      'cruz',
+  zafiro:    'barra',
+  ambar:     'estrella',
+};
+
 /** Las 7 joyas. Cada una define su cara, su luz y su sombra. */
 export const JOYAS = {
   cian:      { base: '#22d3ee', luz: '#a5f3fc', sombra: '#0e7490', halo: '#67e8f9' },
