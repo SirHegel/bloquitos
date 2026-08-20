@@ -1,0 +1,23 @@
+# Electron publica una rama estable cada ocho semanas y solo mantiene las tres
+# últimas, así que una dependencia sin vigilar queda sin parches de seguridad en
+# unos pocos meses. Esto la mantiene al día sin depender de que alguien lo recuerde.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+    labels:
+      - dependencias
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencias
