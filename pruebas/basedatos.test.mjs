@@ -16,6 +16,7 @@ import {
   abrir, guardarPartida, mejoresPartidas, ultimasPartidas, estadisticas,
   leerAjuste, guardarAjuste, logrosConseguidos, revisarLogros, borrarTodo,
   enMemoria, migrarDesdeLocalStorage, LOGROS, ALMACENES,
+  exportar, importar,
 } from '../js/basedatos.js';
 
 before(async () => {
@@ -239,4 +240,111 @@ test('borrar todo deja la base limpia', async () => {
   assert.equal((await logrosConseguidos()).length, 0);
   assert.equal((await estadisticas()).partidas, 0);
   assert.equal(await leerAjuste('sonido', true), true, 'los ajustes vuelven a su valor por defecto');
+});
+
+// ── Respaldo: exportar e importar ───────────────────────────────────────────
+
+test('exportar devuelve el formato esperado con todo dentro', async () => {
+  await borrarTodo();
+  await guardarPartida({ ...partidaBase, puntos: 4200, lineas: 20 });
+  await guardarAjuste('daltonico', true);
+  await revisarLogros({ ...partidaBase, lineas: 1, maxLineasDeGolpe: 1 }, { partidas: 1, lineasTotales: 1 });
+
+  const r = await exportar();
+  assert.equal(r.formato, 'bloquitos');
+  assert.equal(r.version, 1);
+  assert.ok(r.exportado > 0);
+  assert.equal(r.partidas.length, 1);
+  assert.equal(r.partidas[0].puntos, 4200);
+  assert.ok(r.logros.length > 0);
+  assert.equal(r.ajustes.daltonico, true);
+});
+
+test('un respaldo exportado se vuelve a importar entero', async () => {
+  await borrarTodo();
+  for (const p of [500, 1500, 2500]) await guardarPartida({ ...partidaBase, fecha: p * 1000, puntos: p });
+  const respaldo = await exportar();
+
+  await borrarTodo();
+  assert.equal((await ultimasPartidas(10)).length, 0);
+
+  const r = await importar(respaldo);
+  assert.equal(r.ok, true);
+  assert.equal(r.importadas, 3);
+  assert.deepEqual((await mejoresPartidas(10)).map((p) => p.puntos), [2500, 1500, 500]);
+});
+
+test('importar dos veces el mismo archivo no duplica partidas', async () => {
+  await borrarTodo();
+  await guardarPartida({ ...partidaBase, fecha: 111000, puntos: 700 });
+  const respaldo = await exportar();
+  await borrarTodo();
+
+  await importar(respaldo);
+  const segunda = await importar(respaldo);
+  assert.equal(segunda.importadas, 0, 'la segunda vez no debe anadir nada');
+  assert.equal((await ultimasPartidas(10)).length, 1);
+});
+
+test('importar anade a lo existente en vez de reemplazarlo', async () => {
+  await borrarTodo();
+  await guardarPartida({ ...partidaBase, fecha: 1000, puntos: 100 });
+  const respaldo = await exportar();
+
+  await borrarTodo();
+  await guardarPartida({ ...partidaBase, fecha: 2000, puntos: 200 });
+
+  await importar(respaldo);
+  const todas = await ultimasPartidas(10);
+  assert.equal(todas.length, 2, 'deben convivir la partida vieja y la importada');
+  assert.deepEqual(todas.map((p) => p.puntos).sort((a, b) => a - b), [100, 200]);
+});
+
+test('se rechaza cualquier archivo que no sea un respaldo del juego', async () => {
+  await borrarTodo();
+  for (const basura of [null, undefined, 42, 'texto', [], {}, { formato: 'otra-cosa' }]) {
+    const r = await importar(basura);
+    assert.equal(r.ok, false, `deberia rechazar: ${JSON.stringify(basura)}`);
+    assert.ok(r.mensaje.length > 0);
+  }
+  assert.equal((await ultimasPartidas(10)).length, 0, 'nada debe haberse guardado');
+});
+
+test('se rechaza un respaldo de una version mas nueva', async () => {
+  const r = await importar({ formato: 'bloquitos', version: 99, partidas: [] });
+  assert.equal(r.ok, false);
+  assert.match(r.mensaje, /nueva/);
+});
+
+test('un respaldo con partidas corruptas las sanea en vez de guardarlas tal cual', async () => {
+  await borrarTodo();
+  const r = await importar({
+    formato: 'bloquitos', version: 1,
+    partidas: [
+      { fecha: 5000, puntos: -50, lineas: 'muchas', nivel: Infinity, maxLineasDeGolpe: 77 },
+      null,                       // entradas invalidas: se saltan sin romper
+      'no soy una partida',
+      { fecha: 6000, puntos: 300, lineas: 3 },
+    ],
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.importadas, 2, 'solo las dos entradas que son objetos');
+
+  const todas = await ultimasPartidas(10);
+  const mala = todas.find((p) => p.fecha === 5000);
+  assert.equal(mala.puntos, 0, 'un valor negativo queda en 0');
+  assert.equal(mala.lineas, 0, 'un texto no es un numero valido');
+  assert.equal(mala.nivel, 0, 'Infinity no es valido');
+  assert.equal(mala.maxLineasDeGolpe, 4, 'se limita al maximo real');
+});
+
+test('importar no inventa logros que no existen en el catalogo', async () => {
+  await borrarTodo();
+  await importar({
+    formato: 'bloquitos', version: 1, partidas: [],
+    logros: [{ id: 'primera-linea', fecha: 1000 }, { id: 'logro-inventado', fecha: 2000 }],
+  });
+  const guardados = (await logrosConseguidos()).map((l) => l.id);
+  assert.ok(guardados.includes('primera-linea'));
+  assert.ok(!guardados.includes('logro-inventado'), 'un id desconocido debe descartarse');
 });

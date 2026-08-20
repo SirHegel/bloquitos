@@ -16,6 +16,7 @@ import {
   abrir, migrarDesdeLocalStorage, guardarPartida, mejoresPartidas,
   ultimasPartidas, estadisticas, leerAjuste, guardarAjuste,
   logrosConseguidos, revisarLogros, borrarTodo, enMemoria, LOGROS,
+  exportar, importar,
 } from './basedatos.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -527,6 +528,68 @@ $('#btn-fantasma').addEventListener('click', async (e) => {
   btn.setAttribute('aria-pressed', String(ajustes.fantasma));
   btn.textContent = ajustes.fantasma ? '👁' : '🚫';
   await guardarAjuste('fantasma', ajustes.fantasma);
+});
+
+/**
+ * Exportar: se arma el JSON y se entrega como descarga.
+ * El enlace y la URL temporal se crean y se destruyen en el momento, para no
+ * dejar el objeto retenido en memoria.
+ */
+$('#btn-exportar').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  try {
+    const datos = await exportar();
+    const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const f = new Date();
+    const dosDigitos = (n) => String(n).padStart(2, '0');
+    a.href = url;
+    a.download = `bloquitos-${f.getFullYear()}-${dosDigitos(f.getMonth() + 1)}-${dosDigitos(f.getDate())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    btn.textContent = `Guardado · ${datos.partidas.length} partidas`;
+  } catch {
+    btn.textContent = 'No se pudo exportar';
+  }
+  setTimeout(() => { btn.textContent = 'Exportar progreso'; }, 2600);
+});
+
+/** Importar: se abre el selector de archivos y se valida lo que traiga. */
+$('#btn-importar').addEventListener('click', () => $('#archivo-importar').click());
+
+$('#archivo-importar').addEventListener('change', async (e) => {
+  const entrada = e.currentTarget;
+  const btn = $('#btn-importar');
+  const archivo = entrada.files && entrada.files[0];
+  if (!archivo) return;
+
+  // Tope de tamano: un respaldo legitimo pesa unos pocos cientos de KB. Nada
+  // mayor merece intentar analizarse.
+  if (archivo.size > 8 * 1024 * 1024) {
+    btn.textContent = 'El archivo es demasiado grande';
+    entrada.value = '';
+    setTimeout(() => { btn.textContent = 'Importar progreso'; }, 2600);
+    return;
+  }
+
+  try {
+    const texto = await archivo.text();
+    const datos = JSON.parse(texto);
+    const r = await importar(datos);
+    btn.textContent = r.mensaje;
+    if (r.ok) {
+      const totales = await estadisticas();
+      ajustes.record = totales.record;
+      await pintarPestana('records');
+    }
+  } catch {
+    btn.textContent = 'El archivo no es un JSON valido';
+  }
+  entrada.value = '';   // permite volver a elegir el mismo archivo
+  setTimeout(() => { btn.textContent = 'Importar progreso'; }, 3200);
 });
 
 $('#btn-borrar').addEventListener('click', async (e) => {
