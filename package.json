@@ -22,7 +22,7 @@
     "empaquetar:mac": "npm run construir && electron-builder --mac --publish never"
   },
   "devDependencies": {
-    "electron": "^32.0.0",
+    "electron": "^43.4.0",
     "electron-builder": "^25.0.0"
   },
   "build": {
