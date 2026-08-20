@@ -497,20 +497,27 @@ for (const btn of document.querySelectorAll('[data-pestana]')) {
   btn.addEventListener('click', () => abrirDatos(btn.dataset.pestana));
 }
 
+// Nota sobre e.currentTarget: solo es valido mientras el evento se esta
+// despachando. En cuanto el manejador cede el control con un await, el
+// navegador lo deja en null, asi que hay que guardar la referencia al boton
+// ANTES de esperar. Si no, la linea de despues lanza un TypeError y el icono
+// nunca se actualiza.
 $('#btn-sonido').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
   sonido.despertar();
   const activo = sonido.alternar();
   ajustes.sonido = activo;
+  btn.setAttribute('aria-pressed', String(activo));
+  btn.textContent = activo ? '🔊' : '🔇';
   await guardarAjuste('sonido', activo);
-  e.currentTarget.setAttribute('aria-pressed', String(activo));
-  e.currentTarget.textContent = activo ? '🔊' : '🔇';
 });
 
 $('#btn-fantasma').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
   ajustes.fantasma = !ajustes.fantasma;
+  btn.setAttribute('aria-pressed', String(ajustes.fantasma));
+  btn.textContent = ajustes.fantasma ? '👁' : '🚫';
   await guardarAjuste('fantasma', ajustes.fantasma);
-  e.currentTarget.setAttribute('aria-pressed', String(ajustes.fantasma));
-  e.currentTarget.textContent = ajustes.fantasma ? '👁' : '🚫';
 });
 
 $('#btn-borrar').addEventListener('click', async (e) => {
