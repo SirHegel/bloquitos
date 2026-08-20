@@ -875,6 +875,101 @@ async function migrarDesdeLocalStorage() {
   return true;
 }
 
+/**
+ * Exporta todo el progreso a un objeto sencillo, listo para guardar como JSON.
+ *
+ * Hace falta porque toda la base de datos vive solo en este navegador. Basta
+ * con "borrar datos de navegacion", cambiar de equipo o reinstalar el sistema
+ * para perder meses de partidas sin ningun aviso. Esto es la unica via de
+ * respaldo que existe, y sigue sin necesitar servidor ni cuenta.
+ */
+async function exportar() {
+  return {
+    formato: 'bloquitos',
+    version: 1,
+    exportado: Date.now(),
+    partidas: await ultimasPartidas(100000),
+    logros: await logrosConseguidos(),
+    ajustes: {
+      sonido: await leerAjuste('sonido', true),
+      fantasma: await leerAjuste('fantasma', true),
+      daltonico: await leerAjuste('daltonico', false),
+    },
+  };
+}
+
+/**
+ * Importa un respaldo.
+ *
+ * El archivo lo elige la persona que juega, asi que es entrada no confiable:
+ * puede estar corrupto, ser de otra version o directamente no ser un respaldo.
+ * Todo se valida antes de tocar la base de datos, y cada partida pasa por el
+ * mismo saneado que las partidas normales.
+ *
+ * Las partidas se anaden a las existentes en vez de reemplazarlas, y se
+ * descartan las que ya estuvieran (misma fecha y misma puntuacion), para que
+ * importar dos veces el mismo archivo no duplique el historial.
+ *
+ * @returns {{ok:boolean, mensaje:string, importadas?:number}}
+ */
+async function importar(datos) {
+  if (!datos || typeof datos !== 'object') {
+    return { ok: false, mensaje: 'El archivo no contiene datos.' };
+  }
+  if (datos.formato !== 'bloquitos') {
+    return { ok: false, mensaje: 'Este archivo no es un respaldo de Bloquitos.' };
+  }
+  if (entero(datos.version) > 1) {
+    return { ok: false, mensaje: 'El respaldo es de una version mas nueva del juego.' };
+  }
+  if (!Array.isArray(datos.partidas)) {
+    return { ok: false, mensaje: 'El respaldo no tiene lista de partidas.' };
+  }
+
+  // Se descartan duplicados comparando con lo que ya hay.
+  const existentes = new Set(
+    (await ultimasPartidas(100000)).map((p) => `${p.fecha}:${p.puntos}`),
+  );
+
+  let importadas = 0;
+  for (const cruda of datos.partidas) {
+    if (!cruda || typeof cruda !== 'object') continue;
+    const p = saneaPartida(cruda);
+    const clave = `${p.fecha}:${p.puntos}`;
+    if (existentes.has(clave)) continue;
+    existentes.add(clave);
+    await guardarPartida(p);
+    importadas++;
+  }
+
+  // Los logros se unen: los que ya se tenian no se pierden.
+  if (Array.isArray(datos.logros)) {
+    const validos = new Set(LOGROS.map((l) => l.id));
+    for (const l of datos.logros) {
+      if (!l || !validos.has(l.id)) continue;
+      const registro = { id: l.id, fecha: entero(l.fecha) || Date.now() };
+      if (modoMemoria || !bd) memoria.logros.set(l.id, registro);
+      else await transaccion(ALMACENES.LOGROS, 'readwrite', (a) => a.put(registro));
+    }
+  }
+
+  if (datos.ajustes && typeof datos.ajustes === 'object') {
+    for (const clave of ['sonido', 'fantasma', 'daltonico']) {
+      if (typeof datos.ajustes[clave] === 'boolean') {
+        await guardarAjuste(clave, datos.ajustes[clave]);
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    importadas,
+    mensaje: importadas > 0
+      ? `Se anadieron ${importadas} partidas.`
+      : 'El respaldo no traia partidas nuevas.',
+  };
+}
+
 /** Borra todo. Lo usa el botón de reiniciar progreso. */
 async function borrarTodo() {
   memoria.partidas = []; memoria.ajustes.clear(); memoria.logros.clear();
@@ -2404,6 +2499,68 @@ $('#btn-fantasma').addEventListener('click', async (e) => {
   btn.setAttribute('aria-pressed', String(ajustes.fantasma));
   btn.textContent = ajustes.fantasma ? '👁' : '🚫';
   await guardarAjuste('fantasma', ajustes.fantasma);
+});
+
+/**
+ * Exportar: se arma el JSON y se entrega como descarga.
+ * El enlace y la URL temporal se crean y se destruyen en el momento, para no
+ * dejar el objeto retenido en memoria.
+ */
+$('#btn-exportar').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  try {
+    const datos = await exportar();
+    const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const f = new Date();
+    const dosDigitos = (n) => String(n).padStart(2, '0');
+    a.href = url;
+    a.download = `bloquitos-${f.getFullYear()}-${dosDigitos(f.getMonth() + 1)}-${dosDigitos(f.getDate())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    btn.textContent = `Guardado · ${datos.partidas.length} partidas`;
+  } catch {
+    btn.textContent = 'No se pudo exportar';
+  }
+  setTimeout(() => { btn.textContent = 'Exportar progreso'; }, 2600);
+});
+
+/** Importar: se abre el selector de archivos y se valida lo que traiga. */
+$('#btn-importar').addEventListener('click', () => $('#archivo-importar').click());
+
+$('#archivo-importar').addEventListener('change', async (e) => {
+  const entrada = e.currentTarget;
+  const btn = $('#btn-importar');
+  const archivo = entrada.files && entrada.files[0];
+  if (!archivo) return;
+
+  // Tope de tamano: un respaldo legitimo pesa unos pocos cientos de KB. Nada
+  // mayor merece intentar analizarse.
+  if (archivo.size > 8 * 1024 * 1024) {
+    btn.textContent = 'El archivo es demasiado grande';
+    entrada.value = '';
+    setTimeout(() => { btn.textContent = 'Importar progreso'; }, 2600);
+    return;
+  }
+
+  try {
+    const texto = await archivo.text();
+    const datos = JSON.parse(texto);
+    const r = await importar(datos);
+    btn.textContent = r.mensaje;
+    if (r.ok) {
+      const totales = await estadisticas();
+      ajustes.record = totales.record;
+      await pintarPestana('records');
+    }
+  } catch {
+    btn.textContent = 'El archivo no es un JSON valido';
+  }
+  entrada.value = '';   // permite volver a elegir el mismo archivo
+  setTimeout(() => { btn.textContent = 'Importar progreso'; }, 3200);
 });
 
 $('#btn-borrar').addEventListener('click', async (e) => {
