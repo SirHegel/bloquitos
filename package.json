@@ -3,7 +3,10 @@
   "version": "1.1.0",
   "description": "Juego de bloques que caen con niveles infinitos, joyas de caramelo y modo sin conexión",
   "license": "MIT",
-  "author": "SirHegel",
+  "author": {
+    "name": "SirHegel",
+    "email": "SirHegel@users.noreply.github.com"
+  },
   "homepage": "https://sirhegel.github.io/bloquitos/",
   "repository": {
     "type": "git",
@@ -13,7 +16,9 @@
   "private": true,
   "scripts": {
     "construir": "node herramientas/construir.mjs",
+    "vercel-build": "node herramientas/construir.mjs",
     "probar": "node --test",
+    "verificar": "node herramientas/verificar-paquete.mjs",
     "servir": "node herramientas/construir.mjs && python3 -m http.server 8000",
     "escritorio": "npm run construir && electron .",
     "empaquetar": "npm run construir && electron-builder --publish never",
@@ -38,6 +43,7 @@
       "css/**/*",
       "js/bloquitos.js",
       "iconos/**/*",
+      "!iconos/og-bloquitos.*",
       "manifest.webmanifest",
       "escritorio/**/*",
       "LICENSE"
