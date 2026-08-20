@@ -46,6 +46,12 @@ jobs:
           fi
           echo "El paquete coincide con los módulos fuente."
 
+      # El mismo verificador que DESPLIEGUE.md manda pasar antes de publicar.
+      # Va aquí, justo después de reconstruir, para que su comprobación de
+      # frescura compare fechas recién escritas y nunca falle por un clon lento.
+      - name: El paquete está listo para desplegar
+        run: npm run verificar
+
       - name: El manifiesto es JSON válido
         run: node -e "JSON.parse(require('fs').readFileSync('manifest.webmanifest','utf8')); console.log('manifiesto correcto')"
 

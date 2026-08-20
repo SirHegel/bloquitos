@@ -41,3 +41,10 @@ out/
 *.deb
 *.dmg
 *.exe
+
+# ── Despliegue ──
+# "npx vercel" (Opcion B de DESPLIEGUE.md) escribe aqui el identificador del
+# proyecto y el de la cuenta al enlazarlo. Es local de cada equipo y no debe
+# viajar en el repositorio.
+.vercel/
+.vercel

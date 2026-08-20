@@ -18,7 +18,7 @@
 
   frame-ancestors no aparece aqui a proposito: esa directiva se ignora cuando
   llega por <meta>, asi que ponerla solo generaba un aviso en consola. El
-  encabezado real lo pone el servidor (ver .github/workflows y README).
+  encabezado real lo pone el servidor: la regla "/(.*)" de vercel.json.
 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: filesystem:; script-src 'self' file: filesystem:; style-src 'self' file: filesystem:; img-src 'self' data: file: filesystem:; font-src 'self' file:; connect-src 'self' file: filesystem:; media-src 'self' file:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
@@ -27,6 +27,41 @@
 <meta name="description" content="Juego de bloques que caen, con niveles infinitos y joyas de caramelo. Funciona sin conexion y se instala como aplicacion.">
 <meta name="theme-color" content="#0d1030">
 <meta name="color-scheme" content="dark">
+
+<!--
+  Tarjeta para redes sociales y aplicaciones de mensajeria.
+
+  La imagen va con ruta relativa porque la misma pagina se publica en tres sitios
+  con base distinta -- la raiz de un dominio de Vercel, la subcarpeta /bloquitos/
+  de GitHub Pages y el disco duro al abrirla con doble clic -- y una URL absoluta
+  solo seria correcta en uno de los tres.
+
+  El precio hay que decirlo: Open Graph pide una URL absoluta. Slack, Discord y
+  WhatsApp resuelven la relativa contra la direccion de la pagina y la tarjeta
+  sale bien; Facebook y LinkedIn, que exigen la absoluta, pueden mostrar la
+  tarjeta sin imagen. El dia que el juego tenga un dominio fijo y definitivo, lo
+  correcto es poner ahi la URL completa de og:image y twitter:image, y anadir
+  og:url, que hoy falta por el mismo motivo.
+
+  og:image mide 1200x630 (proporcion 1.91:1), que es lo que piden todos ellos
+  para la tarjeta grande; el original vectorial es iconos/og-bloquitos.svg.
+-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Bloquitos">
+<meta property="og:title" content="Bloquitos · joyas que caen">
+<meta property="og:description" content="Bloques que caen, niveles infinitos y joyas de caramelo. Se juega en el navegador, sin conexión y sin anuncios.">
+<meta property="og:image" content="./iconos/og-bloquitos.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="El logotipo de Bloquitos junto a cuatro joyas de colores cayendo">
+<meta property="og:locale" content="es_ES">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bloquitos · joyas que caen">
+<meta name="twitter:description" content="Bloques que caen, niveles infinitos y joyas de caramelo. Se juega en el navegador, sin conexión y sin anuncios.">
+<meta name="twitter:image" content="./iconos/og-bloquitos.png">
+<meta name="twitter:image:alt" content="El logotipo de Bloquitos junto a cuatro joyas de colores cayendo">
 
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./iconos/icono.svg" type="image/svg+xml">

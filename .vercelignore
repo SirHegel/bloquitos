@@ -1,0 +1,52 @@
+# ── Lo que nunca se sube a Vercel ──
+#
+# Vercel despliega el sitio estatico: index.html, css/, js/, iconos/,
+# manifest.webmanifest y sw.js. Todo lo que no llega al navegador sobra en el
+# paquete: menos peso que subir, despliegues mas rapidos y menos superficie
+# expuesta. De herramientas/ solo se sube construir.mjs, que es lo unico que el
+# "buildCommand" ejecuta durante el despliegue.
+#
+# La sintaxis es la de .gitignore, incluida la negacion con "!".
+
+# Aplicacion de escritorio (Electron): no pinta nada en la web.
+escritorio/
+
+# Pruebas: se ejecutan en local y en integracion continua, no en produccion.
+pruebas/
+
+# Configuracion de GitHub Actions.
+.github/
+
+# Salida del empaquetado de escritorio, por si existe en local.
+distribucion/
+
+# Dependencias de desarrollo (electron, electron-builder): pesan cientos de MB
+# y el juego no usa ninguna en el navegador.
+node_modules/
+
+# Texto de la licencia: sigue en el repositorio, no hace falta servirlo.
+LICENSE
+
+# Documentacion en Markdown, el README incluido. Es documentacion del
+# repositorio, no del sitio: DESPLIEGUE.md y herramientas/notas-vercel.md si
+# estan excluidos, asi que un README publicado en el dominio del juego seria
+# una pagina con dos enlaces rotos. Se lee donde tiene sentido, en GitHub.
+*.md
+
+# Herramientas que solo se usan en local y en integracion continua. Con
+# outputDirectory "." todo lo que se sube se sirve tal cual, asi que dejarlas
+# fuera evita publicar en el dominio del juego dos scripts que no pintan nada
+# ahi. El despliegue no las echa en falta: "buildCommand" solo llama a
+# herramientas/construir.mjs, que si se sube.
+herramientas/verificar-paquete.mjs
+herramientas/revisar-secretos.sh
+#
+# construir.mjs si tiene que subirse, porque es lo que ejecuta "buildCommand".
+# Para que no acabe servido en el dominio, el propio buildCommand borra
+# herramientas/ despues de compilar, ya con js/bloquitos.js generado.
+
+# Original vectorial de la tarjeta social. La pagina enlaza el PNG ya generado
+# (og-bloquitos.png, 1200x630); el SVG solo sirve para volver a exportarlo, asi
+# que se queda en el repositorio y no en el dominio. package.json lo excluye
+# igual del empaquetado de escritorio.
+iconos/og-bloquitos.svg

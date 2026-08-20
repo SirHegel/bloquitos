@@ -2,6 +2,7 @@
   "name": "Bloquitos · joyas que caen",
   "short_name": "Bloquitos",
   "description": "Juego de bloques que caen con niveles infinitos y joyas de caramelo. Funciona sin conexión.",
+  "id": "./",
   "lang": "es",
   "dir": "ltr",
   "start_url": "./",

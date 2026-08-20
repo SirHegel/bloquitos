@@ -31,7 +31,13 @@ export class Controles {
     const abajo = (e) => {
       // Se ignoran las combinaciones con Ctrl/Alt/Meta para no pisar los atajos
       // del navegador (recargar, cambiar de pestana, etc).
-      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      //
+      // Excepcion: la tecla Ctrl a solas, que abajo gira la pieza al reves. Su
+      // propio keydown ya llega con ctrlKey = true, asi que sin este permiso la
+      // guardia la descartaba y el `case 'Control'` no se ejecutaba jamas.
+      // Combinaciones como Ctrl+R siguen saliendo por aqui: en ellas la tecla
+      // es 'r', no 'Control'.
+      if ((e.ctrlKey && e.key !== 'Control') || e.altKey || e.metaKey) return;
 
       const manejado = this.pulsar(e.key);
       if (manejado) {
