@@ -86,6 +86,32 @@ test('package.json ofrece los scripts de Vercel y verificación', () => {
   assert.ok(paquete.scripts.verificar.trim(), 'el script verificar está vacío');
 });
 
+test('el release reúne las plataformas y publica sus hashes SHA-256', () => {
+  const workflow = leer('.github/workflows/escritorio.yml');
+  const publicaciones = workflow.match(/uses: softprops\/action-gh-release@v3/gu) ?? [];
+
+  assert.equal(
+    publicaciones.length,
+    1,
+    'el release debe publicarse una sola vez después de completar la matriz',
+  );
+  assert.match(
+    workflow,
+    /uses: actions\/download-artifact@v8[\s\S]*?merge-multiple: true/u,
+    'el job de publicación debe reunir los artefactos de todas las plataformas',
+  );
+  assert.match(
+    workflow,
+    /sha256sum \* \| sort -k 2 > SHA256SUMS/u,
+    'el job de publicación debe generar SHA256SUMS',
+  );
+  assert.match(
+    workflow,
+    /distribucion\/SHA256SUMS/u,
+    'el manifiesto de hashes debe adjuntarse al release',
+  );
+});
+
 test('todas las rutas de ARCHIVOS en sw.js existen en disco', () => {
   const trabajador = leer('sw.js');
   const declaracion = trabajador.match(

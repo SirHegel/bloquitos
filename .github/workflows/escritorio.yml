@@ -74,8 +74,25 @@ jobs:
             distribucion/*.deb
             distribucion/*.dmg
 
+  publicar:
+    name: Publicar release con hashes
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: construir
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Reunir los instaladores de todas las plataformas
+        uses: actions/download-artifact@v8
+        with:
+          pattern: bloquitos-*
+          path: distribucion
+          merge-multiple: true
+
+      - name: Generar el manifiesto SHA-256
+        working-directory: distribucion
+        run: sha256sum * | sort -k 2 > SHA256SUMS
+
       - name: Publicar en Releases (solo al etiquetar)
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with:
           files: |
@@ -83,8 +100,24 @@ jobs:
             distribucion/*.AppImage
             distribucion/*.deb
             distribucion/*.dmg
+            distribucion/SHA256SUMS
           body: |
-            Ejecutables de Bloquitos para Windows, Linux y macOS.
+            ## Qué archivo descargar
+
+            | Sistema | Archivo |
+            | --- | --- |
+            | Windows x64, instalador | `Bloquitos.Setup.*.exe` |
+            | Windows x64, portable | `Bloquitos.*.exe` |
+            | Linux x64, AppImage | `Bloquitos-*.AppImage` |
+            | Debian/Ubuntu x64 | `bloquitos_*_amd64.deb` |
+            | macOS Apple Silicon | `Bloquitos-*-arm64.dmg` |
+            | macOS Intel | `Bloquitos-*.dmg` sin `arm64` |
+
+            `SHA256SUMS` permite comprobar la integridad de todos los archivos:
+
+            ```sh
+            sha256sum -c SHA256SUMS
+            ```
 
             No están firmados digitalmente, así que la primera vez el sistema
             puede pedir confirmación para abrirlos. Es lo normal en aplicaciones
