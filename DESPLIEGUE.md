@@ -188,9 +188,10 @@ pestaña **Application** → **Service Workers**. Debe aparecer `sw.js` con el
 estado **activated and is running**.
 
 En la misma pestaña, **Cache Storage** debe mostrar un almacén llamado
-`bloquitos-v3` con once entradas dentro: la página por partida doble (`/` y
-`/index.html`, porque a las dos direcciones se puede llegar), el manifiesto, el
-CSS, el paquete de JavaScript, los cinco iconos y la tarjeta social.
+`bloquitos-v4` con doce entradas dentro: la página por partida doble (`/` y
+`/index.html`, porque a las dos direcciones se puede llegar), el manifiesto de
+la aplicación, `archivos-cache.json`, el CSS, el paquete de JavaScript, los cinco
+iconos y la tarjeta social.
 
 La prueba de fuego: con la pestaña abierta, marca **Offline** en la sección
 Network y recarga. El juego tiene que seguir funcionando.
@@ -259,13 +260,13 @@ juego una vez seguirá viendo lo que guardó, aunque hayas publicado algo nuevo.
 Para verlo tú ahora mismo: recarga forzando (`Ctrl` + `Shift` + `R`, o `Cmd` +
 `Shift` + `R` en Mac). Si aún así insiste, `F12` → **Application** →
 **Service Workers** → **Unregister**, y en **Cache Storage** borra
-`bloquitos-v3`. Recarga y se instalará limpio.
+`bloquitos-v4`. Recarga y se instalará limpio.
 
 Para que le llegue a todo el mundo, no basta con desplegar: hay que **subir la
 versión de la caché** en `sw.js`.
 
 ```js
-const VERSION = 'bloquitos-v3';   // -> 'bloquitos-v4'
+const VERSION = 'bloquitos-v4';   // -> 'bloquitos-v5'
 ```
 
 Cambiar ese número es lo que hace que el navegador considere el trabajador de

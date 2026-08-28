@@ -13,9 +13,9 @@
  *
  *   - Alguien toca js/render.js, se olvida de reconstruir y sube el paquete de
  *     anteayer. Todo despliega en verde y el arreglo no está en el juego.
- *   - Alguien renombra un icono y no actualiza sw.js. El trabajador de servicio
- *     pide en cache un archivo que ya no existe y el modo sin conexión queda
- *     cojo, en silencio, solo para quien ya tenía el juego instalado.
+ *   - Alguien renombra un icono y no actualiza archivos-cache.json. El
+ *     trabajador pide en cache un archivo que ya no existe y el modo sin
+ *     conexión queda cojo, en silencio, solo para quien ya tenía el juego.
  *
  * Ninguno de los dos rompe la construcción. Los dos rompen el juego.
  *
@@ -25,7 +25,7 @@
  *   2. No queda ninguna línea suelta que empiece por `import ` o `export `.
  *   3. Su fecha de modificación no es anterior a la del módulo más reciente de
  *      js/*.js, es decir: el paquete no está desactualizado.
- *   4. Todos los archivos del array ARCHIVOS de sw.js existen en disco.
+ *   4. archivos-cache.json es una lista segura y todos sus archivos existen.
  *
  * Devuelve 0 si todo está bien, y 1 con un mensaje por cada fallo. Se recogen
  * los cuatro y se informa de todos a la vez: en un despliegue remoto, arreglar
@@ -34,14 +34,13 @@
 
 import { readFileSync, statSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { leerArrayJsonDeclarado } from './leer-array-json.mjs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const PAQUETE = 'js/bloquitos.js';
 const MODULOS = 'js';
-const TRABAJADOR = 'sw.js';
+const MANIFIESTO_CACHE = 'archivos-cache.json';
 
 /**
  * Margen al comparar fechas de modificación.
@@ -172,39 +171,59 @@ if (modulos.length && infoPaquete) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. Todo lo que sw.js manda cachear existe de verdad
+// 4. El manifiesto de la cache es seguro y todo lo que enumera existe
 // ─────────────────────────────────────────────────────────────────────────────
 
-// El array se extrae como JSON estricto en vez de importar sw.js, porque ese
-// archivo usa `self`, `caches` y `addEventListener`: fuera de un navegador no se
-// puede ejecutar. Tratar la lista como datos impide que una expresión insertada
-// en el archivo se ejecute con los privilegios de este proceso de verificación.
 let rutasCache = [];
-let codigoTrabajador = null;
+let contenidoManifiesto = null;
 
 try {
-  codigoTrabajador = readFileSync(join(RAIZ, TRABAJADOR), 'utf8');
+  contenidoManifiesto = readFileSync(join(RAIZ, MANIFIESTO_CACHE), 'utf8');
 } catch (error) {
   fallar(
     error.code === 'ENOENT'
-      ? `${TRABAJADOR} no existe: sin trabajador de servicio no hay modo sin conexión ni instalación.`
-      : `${TRABAJADOR} no se puede leer (${error.code || error.message}).`,
+      ? `${MANIFIESTO_CACHE} no existe: el trabajador no sabe qué guardar sin conexión.`
+      : `${MANIFIESTO_CACHE} no se puede leer (${error.code || error.message}).`,
   );
 }
 
-if (codigoTrabajador !== null) {
-  try {
-    rutasCache = leerArrayJsonDeclarado(codigoTrabajador, 'ARCHIVOS');
+if (contenidoManifiesto !== null) {
+  let datos = null;
 
-    if (!rutasCache.length) {
-      fallar(`El array ARCHIVOS de ${TRABAJADOR} está vacío: el juego no funcionaría sin conexión.`);
-    }
+  try {
+    datos = JSON.parse(contenidoManifiesto);
   } catch (error) {
-    fallar(
-      `El array ARCHIVOS de ${TRABAJADOR} no es una lista JSON segura (${error.message}).`,
-      'Decláralo como un array de cadenas con comillas dobles, sin comentarios,',
-      'expresiones ni comas finales. El verificador nunca ejecuta sw.js.',
-    );
+    fallar(`${MANIFIESTO_CACHE} no es JSON válido (${error.message}).`);
+  }
+
+  if (datos !== null) {
+    if (!Array.isArray(datos) || datos.length === 0) {
+      fallar(`${MANIFIESTO_CACHE} debe ser un array JSON no vacío.`);
+    } else if (!datos.every((ruta) => typeof ruta === 'string')) {
+      fallar(`${MANIFIESTO_CACHE} solo debe contener rutas de texto.`);
+    } else {
+      const destinos = datos.map((ruta) => resolve(RAIZ, ruta));
+      const inseguras = datos.filter((ruta, indice) => {
+        const desdeRaiz = relative(RAIZ, destinos[indice]);
+        return !ruta.startsWith('./')
+          || ruta.includes('?')
+          || ruta.includes('#')
+          || isAbsolute(desdeRaiz)
+          || desdeRaiz === '..'
+          || desdeRaiz.startsWith(`..${sep}`);
+      });
+
+      if (inseguras.length) {
+        fallar(
+          `${MANIFIESTO_CACHE} contiene rutas fuera del proyecto o no relativas:`,
+          ...inseguras,
+        );
+      } else if (new Set(destinos).size !== destinos.length) {
+        fallar(`${MANIFIESTO_CACHE} contiene rutas repetidas.`);
+      } else {
+        rutasCache = datos;
+      }
+    }
   }
 }
 
@@ -226,12 +245,12 @@ if (rutasCache.length) {
 
   if (ausentes.length) {
     fallar(
-      `${ausentes.length} de los ${rutasCache.length} archivos de ARCHIVOS (${TRABAJADOR}) no están en disco:`,
+      `${ausentes.length} de los ${rutasCache.length} archivos de ${MANIFIESTO_CACHE} no están en disco:`,
       ...ausentes,
       '',
       'sw.js añade cada uno por separado, así que el resto sí se cachea y el',
       'fallo no se nota hasta que alguien juega sin conexión y le falta justo',
-      'eso. Corrige la lista de ARCHIVOS o restaura los archivos que falten.',
+      `eso. Corrige ${MANIFIESTO_CACHE} o restaura los archivos que falten.`,
     );
   }
 }
@@ -253,4 +272,4 @@ if (fallos.length) {
 
 console.log(`✓ ${PAQUETE} — ${(infoPaquete.size / 1024).toFixed(1)} KB, al día respecto a ${modulos.length} módulos`);
 console.log('  sin import ni export sueltos');
-console.log(`  ${rutasCache.length} archivos de la cache de ${TRABAJADOR} presentes en disco`);
+console.log(`  ${rutasCache.length} archivos de ${MANIFIESTO_CACHE} presentes en disco`);

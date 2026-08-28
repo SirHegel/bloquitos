@@ -263,12 +263,12 @@ justo el momento en el que hace daño.
 > **Para Bloquitos:** aplicado por los dos lados. `vercel.json` deja esos dos archivos
 > en el valor por defecto de Vercel (`public, max-age=0, must-revalidate`), que no cuesta
 > nada: la CDN los sigue cacheando en el borde durante toda la vida del despliegue, y el
-> modo sin conexión lo da `CacheStorage`, no la caché HTTP. Y `sw.js` descarga la lista
-> de `ARCHIVOS` con `fetch(ruta, { cache: 'reload' })`, que salta la caché HTTP: eso
-> cierra el mismo agujero también en GitHub Pages y con cualquier cabecera futura, donde
-> `vercel.json` no manda. La alternativa, si algún día se quiere un TTL largo de verdad,
-> es ponerle hash al nombre del paquete en `construir.mjs` — pero eso obliga a tocar
-> `index.html` y `sw.js`, y es otra conversación.
+> modo sin conexión lo da `CacheStorage`, no la caché HTTP. Y `sw.js` descarga primero
+> `archivos-cache.json` y después cada ruta con `cache: 'reload'`, que salta la caché
+> HTTP: eso cierra el mismo agujero también en GitHub Pages y con cualquier cabecera
+> futura, donde `vercel.json` no manda. La alternativa, si algún día se quiere un TTL
+> largo de verdad, es ponerle hash al nombre del paquete en `construir.mjs` — pero eso
+> obliga a tocar `index.html` y `sw.js`, y es otra conversación.
 
 [Cabeceras Cache-Control — ajustes recomendados](https://vercel.com/docs/caching/cache-control-headers#recommended-settings) ·
 [Especificación — `Cache.addAll()`](https://w3c.github.io/ServiceWorker/#dom-cache-addall)
@@ -374,11 +374,10 @@ vacío, así que **`/index.html` y `/index` redirigen ambos a `/`** con un 308.
 [Implementación en vercel/vercel](https://github.com/vercel/vercel/blob/main/packages/routing-utils/src/superstatic.ts)
 
 **e.3 — Ese 308 toca a `sw.js`, y *no* era benigno.**
-El array `ARCHIVOS` de `sw.js` incluye `'./index.html'`. Con `cleanUrls`, esa petición
-se encuentra un 308. Guardarla sí funciona: `Cache.addAll()` hace un `fetch` normal
-—modo de redirección `follow`— y solo rechaza *«If response's type is "error", or
-response's status is not an ok status or is 206»*. Un 308 seguido hasta un 200 no es
-ninguna de esas cosas.
+`archivos-cache.json`, que carga `sw.js`, incluye `"./index.html"`. Con `cleanUrls`,
+esa petición se encuentra un 308. Guardarla sí funciona: `guardar()` hace un `fetch`
+con el modo de redirección `follow` predeterminado y recibe el 200 final. Un 308 seguido
+hasta un 200 deja por tanto una respuesta correcta para la caché.
 
 El problema está en **devolverla**, no en guardarla. La respuesta almacenada queda con
 `redirected` a `true`, y el algoritmo *Handle Fetch* rechaza esa respuesta cuando el
@@ -422,8 +421,8 @@ no existe — la cuarta fila de la tabla de e.1.
 **e.5 — El manifiesto y el trabajador resuelven sus rutas contra *su* URL, no contra
 la de la página.** `manifest.webmanifest` declara `"start_url": "./"` y
 `"scope": "./"`; como el archivo se sirve en `/manifest.webmanifest`, su directorio
-base es `/` y ambos valores resuelven a `/`. Lo mismo con las rutas de `ARCHIVOS`
-dentro de `sw.js`, que vive en `/sw.js`.
+base es `/` y ambos valores resuelven a `/`. Lo mismo con las rutas de
+`archivos-cache.json`: `sw.js`, que vive en la raíz, las pasa a `fetch()`.
 
 > **Para Bloquitos:** el alcance del manifiesto (`/`) cubre su `start_url` (`/`) y
 > coincide con el alcance del trabajador de servicio (`/`). Los tres encajan sin que

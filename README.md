@@ -80,6 +80,7 @@ ejecutables de escritorio.
 | `js/main.js` | Une todo: bucle de dibujo, interfaz y registro del trabajador |
 | `js/bloquitos.js` | **Generado.** Todos los módulos en un solo archivo |
 | `sw.js` | Trabajador de servicio: copia local para jugar sin conexión |
+| `archivos-cache.json` | Lista canónica de archivos disponibles sin conexión |
 | `manifest.webmanifest` | Manifiesto de la aplicación instalable |
 | `iconos/` | Iconos de la aplicación y la tarjeta `og-bloquitos.png` para redes |
 | `escritorio/principal.js` | Ventana de la aplicación de escritorio |
@@ -145,10 +146,10 @@ juego se comporta igual a 60 Hz que a 144 Hz. El salto de tiempo está limitado 
 100 ms para que al volver de una pestaña en segundo plano la pieza no caiga en
 picado.
 
-**Todas las rutas son relativas.** En `index.html`, en `manifest.webmanifest` y
-en `sw.js` no hay ni una ruta que empiece por `/`. Es lo que permite que la misma
-copia funcione en la raíz de un dominio, en la subcarpeta `/bloquitos/` de GitHub
-Pages y en el disco duro con doble clic, sin cambiar nada.
+**Todas las rutas son relativas.** En `index.html`, `manifest.webmanifest`,
+`archivos-cache.json` y `sw.js` no hay ni una ruta que empiece por `/`. Es lo que
+permite que la misma copia funcione en la raíz de un dominio, en la subcarpeta
+`/bloquitos/` de GitHub Pages y en el disco duro con doble clic, sin cambiar nada.
 
 ## La base de datos
 
@@ -231,7 +232,7 @@ puntuación, combos, condiciones de fin de partida y simulación de partidas
 completas—, toda la base de datos (guardado, orden, agregados, validación de
 datos corruptos, logros y borrado) y el contrato de despliegue: que `vercel.json`
 declare lo que tiene que declarar, que las rutas de `index.html` sigan siendo
-relativas y que todo lo que `sw.js` manda cachear exista de verdad.
+relativas y que todo lo enumerado por `archivos-cache.json` exista de verdad.
 
 ## Publicar en la web
 
@@ -277,13 +278,13 @@ pedir confirmación para abrirlos.
 ## Al modificar el juego
 
 1. Regenera el paquete y compruébalo: `npm run construir && npm run verificar`
-2. **Sube la versión de la caché** en `sw.js` (`bloquitos-v3` → `v4`). Si no, los
+2. **Sube la versión de la caché** en `sw.js` (`bloquitos-v4` → `v5`). Si no, los
    navegadores que ya lo tengan instalado seguirán sirviendo la versión vieja.
 3. Si cambias la forma de los datos guardados, sube `VERSION_BD` en
    `js/basedatos.js` y añade la migración en `onupgradeneeded`.
 4. Si añades, quitas o renombras un archivo que deba estar disponible sin
-   conexión, actualiza el array `ARCHIVOS` de `sw.js`. `npm run verificar` falla
-   si esa lista apunta a algo que no existe, pero no puede adivinar lo que falta.
+   conexión, actualiza `archivos-cache.json`. `npm run verificar` falla si esa
+   lista apunta a algo que no existe, pero no puede adivinar lo que falta.
 
 ## Licencia
 

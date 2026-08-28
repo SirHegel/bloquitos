@@ -1,10 +1,10 @@
 # ── Lo que nunca se sube a Vercel ──
 #
 # Vercel despliega el sitio estatico: index.html, css/, js/, iconos/,
-# manifest.webmanifest y sw.js. Todo lo que no llega al navegador sobra en el
-# paquete: menos peso que subir, despliegues mas rapidos y menos superficie
-# expuesta. De herramientas/ solo se sube construir.mjs, que es lo unico que el
-# "buildCommand" ejecuta durante el despliegue.
+# manifest.webmanifest, archivos-cache.json y sw.js. Todo lo que no llega al
+# navegador sobra en el paquete: menos peso que subir, despliegues mas rapidos y
+# menos superficie expuesta. De herramientas/ solo se sube construir.mjs, que es
+# lo unico que el "buildCommand" ejecuta durante el despliegue.
 #
 # La sintaxis es la de .gitignore, incluida la negacion con "!".
 
