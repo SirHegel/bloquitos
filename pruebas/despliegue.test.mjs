@@ -12,9 +12,10 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runInNewContext } from 'node:vm';
 
-const RAIZ = fileURLToPath(new URL('../', import.meta.url));
+const URL_RAIZ = new URL('../', import.meta.url);
+const RAIZ = fileURLToPath(URL_RAIZ);
+const MANIFIESTO_CACHE = 'archivos-cache.json';
 
 function ruta(...partes) {
   return resolve(RAIZ, ...partes);
@@ -112,30 +113,185 @@ test('el release reúne las plataformas y publica sus hashes SHA-256', () => {
   );
 });
 
-test('todas las rutas de ARCHIVOS en sw.js existen en disco', () => {
-  const trabajador = leer('sw.js');
-  const declaracion = trabajador.match(
-    /\b(?:const|let|var)\s+ARCHIVOS\s*=\s*(\[[\s\S]*?\])\s*;/u,
-  );
-  assert.ok(declaracion, 'no se encontró el array ARCHIVOS en sw.js');
-
-  const archivosEvaluados = runInNewContext(
-    declaracion[1],
-    Object.create(null),
-    { timeout: 100 },
-  );
-  assert.ok(Array.isArray(archivosEvaluados), 'ARCHIVOS debe ser un array');
-  // Se copia al contexto actual para que las comparaciones estrictas de Node no
-  // tropiecen con el prototipo Array aislado que crea node:vm.
-  const archivos = Array.from(archivosEvaluados);
-  assert.ok(archivos.length > 0, 'ARCHIVOS no puede estar vacío');
+test('archivos-cache.json es una lista JSON no vacía de rutas de texto', () => {
+  const archivos = leerJson(MANIFIESTO_CACHE);
+  assert.ok(Array.isArray(archivos), `${MANIFIESTO_CACHE} debe ser un array`);
+  assert.ok(archivos.length > 0, `${MANIFIESTO_CACHE} no puede estar vacío`);
   assert.ok(
     archivos.every((archivo) => typeof archivo === 'string'),
-    'ARCHIVOS solo debe contener rutas de texto',
+    `${MANIFIESTO_CACHE} solo debe contener texto`,
   );
+});
 
-  const faltantes = archivos.filter((archivo) => !existsSync(ruta(archivo)));
-  assert.deepEqual(faltantes, [], `faltan rutas de ARCHIVOS: ${faltantes.join(', ')}`);
+test('el contrato JSON rechaza comentarios y strings usados como señuelo', () => {
+  const señuelos = [
+    '// ["./linea"]\n["./real"]',
+    '/* ["./bloque"] */\n["./real"]',
+    '"const ARCHIVOS = [\\"./string\\"];"',
+  ];
+
+  for (const contenido of señuelos) {
+    let esListaDeRutas = false;
+    try {
+      const datos = JSON.parse(contenido);
+      esListaDeRutas = Array.isArray(datos)
+        && datos.length > 0
+        && datos.every((rutaCache) => typeof rutaCache === 'string');
+    } catch {
+      // Un comentario no forma parte de la gramática JSON y debe caer aquí.
+    }
+    assert.equal(esListaDeRutas, false, `se aceptó el señuelo: ${contenido}`);
+  }
+});
+
+test('las rutas de archivos-cache.json son relativas, únicas y quedan dentro del proyecto', () => {
+  const archivos = leerJson(MANIFIESTO_CACHE);
+  const destinos = archivos.map((archivo) => new URL(archivo, URL_RAIZ));
+
+  assert.ok(
+    archivos.every((archivo) => archivo.startsWith('./')),
+    'todas las rutas deben empezar por ./',
+  );
+  assert.ok(
+    destinos.every((destino) => (
+      destino.protocol === 'file:'
+      && destino.href.startsWith(URL_RAIZ.href)
+      && !destino.search
+      && !destino.hash
+    )),
+    'una ruta sale del directorio del proyecto',
+  );
+  assert.equal(
+    new Set(destinos.map(({ href }) => href)).size,
+    destinos.length,
+    'hay rutas repetidas',
+  );
+});
+
+test('todas las rutas de archivos-cache.json existen en disco', () => {
+  const archivos = leerJson(MANIFIESTO_CACHE);
+  const faltantes = archivos.filter((archivo) => {
+    const destino = archivo.endsWith('/') ? `${archivo}index.html` : archivo;
+    return !existsSync(ruta(destino));
+  });
+
+  assert.deepEqual(faltantes, [], `faltan rutas de cache: ${faltantes.join(', ')}`);
+});
+
+test('sw.js carga, valida y guarda el manifiesto canónico antes de sus archivos', () => {
+  const trabajador = leer('sw.js');
+
+  assert.match(
+    trabajador,
+    /const MANIFIESTO_CACHE = '\.\/archivos-cache\.json';/u,
+    'sw.js no apunta al manifiesto canónico',
+  );
+  assert.match(
+    trabajador,
+    /fetch\(MANIFIESTO_CACHE,\s*\{\s*cache:\s*'reload'\s*\}\)/u,
+    'el manifiesto podría salir de la caché HTTP anterior',
+  );
+  assert.match(
+    trabajador,
+    /validarRutasCache\(await respuesta\.json\(\)\)/u,
+    'sw.js no valida el JSON recibido',
+  );
+  assert.match(
+    trabajador,
+    /cache\.put\(\s*MANIFIESTO_CACHE,/u,
+    'el propio manifiesto no queda disponible sin conexión',
+  );
+});
+
+test('sw.js no vuelve a incrustar ni evaluar una segunda fuente de rutas', () => {
+  const trabajador = leer('sw.js');
+  assert.doesNotMatch(trabajador, /\b(?:const|let|var)\s+ARCHIVOS\b/u);
+  assert.doesNotMatch(trabajador, /\b(?:eval|Function)\s*\(/u);
+});
+
+test('la instalación rechaza rutas externas y cachea un manifiesto válido', async () => {
+  const teniaSelf = Object.hasOwn(globalThis, 'self');
+  const teniaCaches = Object.hasOwn(globalThis, 'caches');
+  const selfOriginal = globalThis.self;
+  const cachesOriginal = globalThis.caches;
+  const fetchOriginal = globalThis.fetch;
+  const eventos = new Map();
+  const guardados = [];
+  const peticiones = [];
+  let rutasRemotas = ['./../otro-proyecto/index.html'];
+  let activaciones = 0;
+
+  globalThis.self = {
+    location: new URL('https://ejemplo.test/bloquitos/sw.js'),
+    clients: { claim: async () => {} },
+    addEventListener(tipo, manejador) {
+      eventos.set(tipo, manejador);
+    },
+    async skipWaiting() {
+      activaciones += 1;
+    },
+  };
+  globalThis.caches = {
+    async open() {
+      return {
+        async put(clave) {
+          guardados.push(String(clave));
+        },
+      };
+    },
+    async keys() {
+      return [];
+    },
+  };
+  globalThis.fetch = async (entrada, opciones = {}) => {
+    const ruta = String(entrada);
+    peticiones.push([ruta, opciones.cache]);
+    return ruta === './archivos-cache.json'
+      ? new Response(JSON.stringify(rutasRemotas), { status: 200 })
+      : new Response(`contenido de ${ruta}`, { status: 200 });
+  };
+
+  function instalar() {
+    let promesa;
+    eventos.get('install')({
+      waitUntil(trabajo) {
+        promesa = trabajo;
+      },
+    });
+    return promesa;
+  }
+
+  try {
+    await import('../sw.js');
+
+    await assert.rejects(instalar(), /sale del alcance del trabajador/u);
+    assert.equal(activaciones, 0, 'un manifiesto inseguro llegó a activar el trabajador');
+    assert.deepEqual(guardados, [], 'un manifiesto inseguro llegó a la cache');
+
+    rutasRemotas = ['./', './index.html'];
+    peticiones.length = 0;
+    await instalar();
+
+    assert.equal(activaciones, 1, 'el trabajador válido no terminó de instalarse');
+    assert.deepEqual(
+      new Set(guardados),
+      new Set(['./archivos-cache.json', './', './index.html']),
+    );
+    assert.deepEqual(
+      peticiones,
+      [
+        ['./archivos-cache.json', 'reload'],
+        ['./', 'reload'],
+        ['./index.html', 'reload'],
+      ],
+    );
+  } finally {
+    if (teniaSelf) globalThis.self = selfOriginal;
+    else delete globalThis.self;
+    if (teniaCaches) globalThis.caches = cachesOriginal;
+    else delete globalThis.caches;
+    globalThis.fetch = fetchOriginal;
+  }
 });
 
 test('index.html usa rutas relativas y declara la imagen social', () => {

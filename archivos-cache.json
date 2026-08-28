@@ -1,0 +1,13 @@
+[
+  "./",
+  "./index.html",
+  "./manifest.webmanifest",
+  "./css/estilos.css",
+  "./js/bloquitos.js",
+  "./iconos/icono.svg",
+  "./iconos/icono-180.png",
+  "./iconos/icono-192.png",
+  "./iconos/icono-512.png",
+  "./iconos/icono-mascara-512.png",
+  "./iconos/og-bloquitos.png"
+]

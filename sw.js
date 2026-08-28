@@ -11,7 +11,7 @@
  * trafico ajeno aunque algo lo intentara.
  */
 
-const VERSION = 'bloquitos-v3';
+const VERSION = 'bloquitos-v4';
 
 // Todas las caches del juego empiezan por este prefijo. Al activar se borran las
 // que lo llevan y no son la version actual, en vez de vaciar el almacen entero:
@@ -19,33 +19,56 @@ const VERSION = 'bloquitos-v3';
 // usuario.github.io, y borrar sin mirar el nombre dejaria sin su copia sin
 // conexion a cualquier otra pagina publicada ahi.
 const PREFIJO = 'bloquitos-';
+const MANIFIESTO_CACHE = './archivos-cache.json';
 
-// Se cachea el paquete generado (js/bloquitos.js), que es lo que carga la
-// pagina, no los modulos sueltos de js/. Esos siguen existiendo para desarrollo
-// y para las pruebas, pero el navegador nunca los pide.
+// archivos-cache.json es la única fuente de la lista que se guarda sin conexión.
+// Se mantiene como JSON separado para que el trabajador, las pruebas y el
+// verificador puedan leer los mismos datos sin extraer ni ejecutar JavaScript.
 //
-// Estan los cinco iconos, no solo dos: el de 180 lo pide iOS al anadir a la
-// pantalla de inicio y el enmascarado lo pide Android al instalar, y los dos se
-// piden justo cuando el juego puede estar ya sin conexion. La tarjeta social
-// (og-bloquitos.png) no la usa la pagina --la piden los rastreadores de enlaces
-// desde su propio servidor-- pero se guarda igual para que la copia local sea
-// exactamente lo publicado y no una parte.
-//
-// herramientas/verificar-paquete.mjs lee esta lista y falla si alguna de estas
-// rutas no existe en disco: no se puede renombrar un icono y olvidarse de aqui.
-const ARCHIVOS = [
-  './',
-  './index.html',
-  './manifest.webmanifest',
-  './css/estilos.css',
-  './js/bloquitos.js',
-  './iconos/icono.svg',
-  './iconos/icono-180.png',
-  './iconos/icono-192.png',
-  './iconos/icono-512.png',
-  './iconos/icono-mascara-512.png',
-  './iconos/og-bloquitos.png',
-];
+// La lista se valida también aquí, en el límite de confianza de la red. Solo se
+// aceptan rutas ./ del mismo origen y bajo el directorio del trabajador. Así un
+// manifiesto alterado no puede hacer que la instalación solicite otros sitios o
+// otros proyectos que compartan el origen usuario.github.io.
+function validarRutasCache(datos) {
+  if (!Array.isArray(datos) || datos.length === 0) {
+    throw new TypeError(`${MANIFIESTO_CACHE} debe ser un array JSON no vacío`);
+  }
+
+  const base = new URL('./', self.location.href);
+  const vistas = new Set();
+
+  for (const ruta of datos) {
+    if (typeof ruta !== 'string' || !ruta.startsWith('./')) {
+      throw new TypeError(`${MANIFIESTO_CACHE} solo admite rutas de texto que empiecen por ./`);
+    }
+
+    const url = new URL(ruta, base);
+    if (
+      url.origin !== base.origin
+      || !url.pathname.startsWith(base.pathname)
+      || url.search
+      || url.hash
+    ) {
+      throw new TypeError(`${ruta} sale del alcance del trabajador`);
+    }
+    if (vistas.has(url.href)) throw new TypeError(`${ruta} está repetida`);
+    vistas.add(url.href);
+  }
+
+  return datos;
+}
+
+/** Descarga, analiza y conserva la fuente canónica de las rutas sin conexión. */
+async function cargarManifiestoCache() {
+  const respuesta = await fetch(MANIFIESTO_CACHE, { cache: 'reload' });
+  if (!respuesta.ok) {
+    throw new Error(`${MANIFIESTO_CACHE} respondio ${respuesta.status}`);
+  }
+
+  const paraCache = respuesta.clone();
+  const rutas = validarRutasCache(await respuesta.json());
+  return { rutas, respuesta: paraCache };
+}
 
 /**
  * Devuelve la respuesta sin la marca de redirigida.
@@ -88,10 +111,21 @@ async function guardar(cache, ruta) {
 
 self.addEventListener('install', (evento) => {
   evento.waitUntil(
-    caches.open(VERSION)
-      // Se anaden de uno en uno, no con addAll, que falla entero si un solo
-      // archivo falla: si un icono no esta, el resto del juego se cachea igual.
-      .then((cache) => Promise.allSettled(ARCHIVOS.map((a) => guardar(cache, a))))
+    Promise.all([caches.open(VERSION), cargarManifiestoCache()])
+      .then(async ([cache, manifiesto]) => {
+        // El propio manifiesto queda disponible sin conexión sin descargarlo
+        // dos veces: cargarManifiestoCache conserva una copia de la respuesta.
+        await cache.put(
+          MANIFIESTO_CACHE,
+          await sinRedireccion(manifiesto.respuesta),
+        );
+
+        // Se añaden de uno en uno, no con addAll, que falla entero si un solo
+        // archivo falla: si un icono no está, el resto del juego se cachea igual.
+        await Promise.allSettled(
+          manifiesto.rutas.map((ruta) => guardar(cache, ruta)),
+        );
+      })
       .then(() => self.skipWaiting()),
   );
 });
