@@ -284,7 +284,9 @@ pedir confirmación para abrirlos.
    `js/basedatos.js` y añade la migración en `onupgradeneeded`.
 4. Si añades, quitas o renombras un archivo que deba estar disponible sin
    conexión, actualiza `archivos-cache.json`. `npm run verificar` falla si esa
-   lista apunta a algo que no existe, pero no puede adivinar lo que falta.
+   lista apunta a algo que no existe, pero no puede adivinar lo que falta. Haz
+   también el incremento del paso 2: cambiar solo el JSON no hace que los
+   navegadores busquen una versión nueva de `sw.js`.
 
 ## Licencia
 

@@ -39,7 +39,7 @@ Antes de publicar, conviene dejar el paquete al día en local:
 ```sh
 npm run construir     # regenera js/bloquitos.js desde los módulos
 npm run verificar     # comprueba que lo que se va a desplegar sirve
-npm run probar        # las 66 pruebas
+npm run probar        # todas las pruebas automatizadas
 ```
 
 Vercel vuelve a construir el paquete por su cuenta durante el despliegue, así
