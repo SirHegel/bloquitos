@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runInNewContext } from 'node:vm';
+import { leerArrayJsonDeclarado } from '../herramientas/leer-array-json.mjs';
 
 const RAIZ = fileURLToPath(new URL('../', import.meta.url));
 
@@ -114,28 +114,64 @@ test('el release reúne las plataformas y publica sus hashes SHA-256', () => {
 
 test('todas las rutas de ARCHIVOS en sw.js existen en disco', () => {
   const trabajador = leer('sw.js');
-  const declaracion = trabajador.match(
-    /\b(?:const|let|var)\s+ARCHIVOS\s*=\s*(\[[\s\S]*?\])\s*;/u,
-  );
-  assert.ok(declaracion, 'no se encontró el array ARCHIVOS en sw.js');
-
-  const archivosEvaluados = runInNewContext(
-    declaracion[1],
-    Object.create(null),
-    { timeout: 100 },
-  );
-  assert.ok(Array.isArray(archivosEvaluados), 'ARCHIVOS debe ser un array');
-  // Se copia al contexto actual para que las comparaciones estrictas de Node no
-  // tropiecen con el prototipo Array aislado que crea node:vm.
-  const archivos = Array.from(archivosEvaluados);
+  const archivos = leerArrayJsonDeclarado(trabajador, 'ARCHIVOS');
   assert.ok(archivos.length > 0, 'ARCHIVOS no puede estar vacío');
-  assert.ok(
-    archivos.every((archivo) => typeof archivo === 'string'),
-    'ARCHIVOS solo debe contener rutas de texto',
-  );
 
   const faltantes = archivos.filter((archivo) => !existsSync(ruta(archivo)));
   assert.deepEqual(faltantes, [], `faltan rutas de ARCHIVOS: ${faltantes.join(', ')}`);
+});
+
+test('el lector de ARCHIVOS rechaza expresiones sin ejecutarlas', () => {
+  const marca = '__bloquitos_prueba_inyeccion__';
+  const codigo = [
+    'const ARCHIVOS = [(() => {',
+    `  globalThis.${marca} = true;`,
+    '  return "./index.html";',
+    '})()];',
+  ].join('\n');
+
+  delete globalThis[marca];
+  try {
+    assert.throws(
+      () => leerArrayJsonDeclarado(codigo, 'ARCHIVOS'),
+      /exclusivamente datos JSON válidos/u,
+    );
+    assert.equal(globalThis[marca], undefined, 'el contenido leído llegó a ejecutarse');
+  } finally {
+    delete globalThis[marca];
+  }
+});
+
+test('el lector de ARCHIVOS solo acepta un array JSON de cadenas literales', () => {
+  const expresiones = [
+    ['llamada', 'const ARCHIVOS = [obtenerRuta()];'],
+    ['spread', 'const ARCHIVOS = [...otrasRutas];'],
+    ['identificador', 'const ARCHIVOS = [RUTA_INICIO];'],
+    ['plantilla', 'const ARCHIVOS = [`./${nombre}`];'],
+    ['valor calculado', 'const ARCHIVOS = ["./" + nombre];'],
+  ];
+
+  for (const [tipo, codigo] of expresiones) {
+    assert.throws(
+      () => leerArrayJsonDeclarado(codigo, 'ARCHIVOS'),
+      /exclusivamente datos JSON válidos/u,
+      `se aceptó una expresión de tipo ${tipo}`,
+    );
+  }
+
+  assert.throws(
+    () => leerArrayJsonDeclarado('const ARCHIVOS = ["./", 42];', 'ARCHIVOS'),
+    /solo debe contener rutas de texto/u,
+    'se aceptó un valor JSON que no es texto',
+  );
+});
+
+test('el lector de ARCHIVOS admite corchetes dentro de una ruta JSON', () => {
+  const codigo = 'const ARCHIVOS = ["./iconos/[mascara].png"];';
+  assert.deepEqual(
+    leerArrayJsonDeclarado(codigo, 'ARCHIVOS'),
+    ['./iconos/[mascara].png'],
+  );
 });
 
 test('index.html usa rutas relativas y declara la imagen social', () => {

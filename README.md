@@ -216,7 +216,7 @@ Hace falta Node solo para las herramientas; el juego en sí no lo usa. No hay
 
 | Comando | Qué hace |
 |---|---|
-| `npm run probar` | Las 67 pruebas (`node --test`) |
+| `npm run probar` | Las pruebas automatizadas (`node --test`) |
 | `npm run construir` | Regenera `js/bloquitos.js` desde los módulos |
 | `npm run verificar` | Comprueba que lo que se va a desplegar sirve |
 | `npm run servir` | Construye y sirve en `http://localhost:8000` |

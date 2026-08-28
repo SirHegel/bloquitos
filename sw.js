@@ -33,18 +33,20 @@ const PREFIJO = 'bloquitos-';
 //
 // herramientas/verificar-paquete.mjs lee esta lista y falla si alguna de estas
 // rutas no existe en disco: no se puede renombrar un icono y olvidarse de aqui.
+// Se usa deliberadamente sintaxis JSON estricta: las herramientas extraen estos
+// datos con JSON.parse y nunca ejecutan el contenido de este archivo desde Node.
 const ARCHIVOS = [
-  './',
-  './index.html',
-  './manifest.webmanifest',
-  './css/estilos.css',
-  './js/bloquitos.js',
-  './iconos/icono.svg',
-  './iconos/icono-180.png',
-  './iconos/icono-192.png',
-  './iconos/icono-512.png',
-  './iconos/icono-mascara-512.png',
-  './iconos/og-bloquitos.png',
+  "./",
+  "./index.html",
+  "./manifest.webmanifest",
+  "./css/estilos.css",
+  "./js/bloquitos.js",
+  "./iconos/icono.svg",
+  "./iconos/icono-180.png",
+  "./iconos/icono-192.png",
+  "./iconos/icono-512.png",
+  "./iconos/icono-mascara-512.png",
+  "./iconos/og-bloquitos.png"
 ];
 
 /**

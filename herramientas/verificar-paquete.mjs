@@ -35,6 +35,7 @@
 import { readFileSync, statSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { leerArrayJsonDeclarado } from './leer-array-json.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -174,35 +175,37 @@ if (modulos.length && infoPaquete) {
 // 4. Todo lo que sw.js manda cachear existe de verdad
 // ─────────────────────────────────────────────────────────────────────────────
 
-// El array se lee con una expresión regular en vez de importar sw.js, porque
-// ese archivo usa `self`, `caches` y `addEventListener`: fuera de un navegador
-// no se puede ejecutar. Aquí solo interesa la lista de rutas, no el código.
+// El array se extrae como JSON estricto en vez de importar sw.js, porque ese
+// archivo usa `self`, `caches` y `addEventListener`: fuera de un navegador no se
+// puede ejecutar. Tratar la lista como datos impide que una expresión insertada
+// en el archivo se ejecute con los privilegios de este proceso de verificación.
 let rutasCache = [];
+let codigoTrabajador = null;
 
 try {
-  const codigo = readFileSync(join(RAIZ, TRABAJADOR), 'utf8');
-  const bloque = codigo.match(/const\s+ARCHIVOS\s*=\s*\[([\s\S]*?)\]\s*;/);
-
-  if (!bloque) {
-    fallar(
-      `No se encuentra el array ARCHIVOS en ${TRABAJADOR}.`,
-      'Si lo has renombrado o has cambiado su forma, ajusta también la',
-      'expresión regular de este script: mientras no cuadre, nadie comprueba',
-      'que la lista de la cache siga apuntando a archivos que existen.',
-    );
-  } else {
-    rutasCache = [...bloque[1].matchAll(/'([^']*)'|"([^"]*)"/g)].map((m) => m[1] ?? m[2]);
-
-    if (!rutasCache.length) {
-      fallar(`El array ARCHIVOS de ${TRABAJADOR} está vacío: el juego no funcionaría sin conexión.`);
-    }
-  }
+  codigoTrabajador = readFileSync(join(RAIZ, TRABAJADOR), 'utf8');
 } catch (error) {
   fallar(
     error.code === 'ENOENT'
       ? `${TRABAJADOR} no existe: sin trabajador de servicio no hay modo sin conexión ni instalación.`
       : `${TRABAJADOR} no se puede leer (${error.code || error.message}).`,
   );
+}
+
+if (codigoTrabajador !== null) {
+  try {
+    rutasCache = leerArrayJsonDeclarado(codigoTrabajador, 'ARCHIVOS');
+
+    if (!rutasCache.length) {
+      fallar(`El array ARCHIVOS de ${TRABAJADOR} está vacío: el juego no funcionaría sin conexión.`);
+    }
+  } catch (error) {
+    fallar(
+      `El array ARCHIVOS de ${TRABAJADOR} no es una lista JSON segura (${error.message}).`,
+      'Decláralo como un array de cadenas con comillas dobles, sin comentarios,',
+      'expresiones ni comas finales. El verificador nunca ejecuta sw.js.',
+    );
+  }
 }
 
 if (rutasCache.length) {
