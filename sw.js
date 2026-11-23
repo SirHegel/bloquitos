@@ -73,14 +73,9 @@ async function cargarManifiestoCache() {
 /**
  * Devuelve la respuesta sin la marca de redirigida.
  *
- * "cleanUrls" de vercel.json convierte /index.html en un 308 hacia /. fetch lo
- * sigue solo y la respuesta final llega correcta, pero con redirected = true.
- * Devolver una respuesta asi desde respondWith() a una navegacion --cuyo modo
- * de redireccion es "manual", no "follow"-- es un error de red: el navegador
- * pinta su pantalla de fallo en vez del juego. Como aqui se guarda para
- * servirla despues, se reconstruye limpia: mismo cuerpo, mismas cabeceras, sin
- * historial de desvios. En GitHub Pages y con doble clic no hay redireccion y
- * esta funcion no hace nada.
+ * Si fetch sigue una redireccion, la respuesta conserva redirected = true.
+ * Una navegacion en modo "manual" falla al recibir esa respuesta desde
+ * respondWith(). Se conservan el cuerpo y las cabeceras para servirla despues.
  */
 async function sinRedireccion(respuesta) {
   if (!respuesta.redirected) return respuesta;
@@ -101,7 +96,7 @@ async function sinRedireccion(respuesta) {
  * bloquitos-vN recien creada se rellenara con el paquete ANTERIOR. Como despues
  * el manejador fetch sirve primero desde CacheStorage, esa copia vieja se
  * quedaria ahi hasta la siguiente version del trabajador: el despliegue nuevo no
- * llegaria nunca. Ver herramientas/notas-vercel.md, apartado c.5.
+ * llegaria nunca.
  */
 async function guardar(cache, ruta) {
   const respuesta = await fetch(ruta, { cache: 'reload' });
