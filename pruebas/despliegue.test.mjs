@@ -3,8 +3,7 @@
  *
  * Se ejecutan con:  npm run probar   (node --test sobre todo el proyecto)
  *
- * Estas comprobaciones no escriben en el proyecto: validan la configuración de
- * Vercel y que las referencias publicables permanezcan coherentes entre sí.
+ * Estas comprobaciones validan los archivos publicables sin modificarlos.
  */
 
 import { test } from 'node:test';
@@ -40,49 +39,8 @@ function valoresDeAtributo(html, atributo) {
   ));
 }
 
-test('vercel.json declara la construcción y las cabeceras requeridas', () => {
-  assert.ok(existsSync(ruta('vercel.json')), 'falta vercel.json');
-
-  const configuracion = leerJson('vercel.json');
-  assert.equal(typeof configuracion.buildCommand, 'string', 'falta buildCommand');
-  assert.ok(configuracion.buildCommand.trim(), 'buildCommand está vacío');
-  assert.equal(typeof configuracion.outputDirectory, 'string', 'falta outputDirectory');
-  assert.ok(configuracion.outputDirectory.trim(), 'outputDirectory está vacío');
-
-  // Sin installCommand, Vercel ejecuta `npm install` a secas e instala electron
-  // y electron-builder en cada despliegue: cientos de megas que la web no usa.
-  assert.equal(typeof configuracion.installCommand, 'string', 'falta installCommand');
-  assert.match(
-    configuracion.installCommand,
-    /--omit=dev/u,
-    'installCommand debe excluir las dependencias de desarrollo',
-  );
-
-  assert.ok(Array.isArray(configuracion.headers), 'headers debe ser un array');
-  const fuentes = new Set(configuracion.headers.map(({ source }) => source));
-  assert.ok(fuentes.has('/sw.js'), 'faltan las cabeceras de /sw.js');
-  assert.ok(fuentes.has('/(.*)'), 'faltan las cabeceras globales de /(.*)');
-});
-
-test('.vercelignore excluye pruebas, escritorio y configuración de GitHub', () => {
-  assert.ok(existsSync(ruta('.vercelignore')), 'falta .vercelignore');
-
-  const entradas = new Set(
-    leer('.vercelignore')
-      .split(/\r?\n/u)
-      .map((linea) => linea.trim())
-      .filter((linea) => linea && !linea.startsWith('#')),
-  );
-
-  for (const directorio of ['pruebas/', 'escritorio/', '.github/']) {
-    assert.ok(entradas.has(directorio), `.vercelignore no incluye ${directorio}`);
-  }
-});
-
-test('package.json ofrece los scripts de Vercel y verificación', () => {
+test('package.json ofrece el script de verificación', () => {
   const paquete = leerJson('package.json');
-  assert.equal(typeof paquete.scripts?.['vercel-build'], 'string', 'falta el script vercel-build');
-  assert.ok(paquete.scripts['vercel-build'].trim(), 'el script vercel-build está vacío');
   assert.equal(typeof paquete.scripts?.verificar, 'string', 'falta el script verificar');
   assert.ok(paquete.scripts.verificar.trim(), 'el script verificar está vacío');
 });

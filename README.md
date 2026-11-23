@@ -10,10 +10,6 @@ que espera alguien que lleva años jugando a este género.
 
 **▶ Jugar ahora: [sirhegel.github.io/bloquitos](https://sirhegel.github.io/bloquitos/)**
 
-La misma versión se publica además en Vercel, que añade las cabeceras de
-seguridad reales y una dirección de vista previa por cada rama. Cómo publicarlo
-está en **[DESPLIEGUE.md](DESPLIEGUE.md)**.
-
 ## Cómo se instala
 
 Depende de cómo quieras jugarlo. Ninguna de las tres opciones necesita instalar
@@ -87,13 +83,9 @@ ejecutables de escritorio.
 | `herramientas/construir.mjs` | Genera `js/bloquitos.js` |
 | `herramientas/verificar-paquete.mjs` | Comprueba que lo que se va a desplegar sirve |
 | `herramientas/revisar-secretos.sh` | Busca credenciales y rutas locales antes de publicar |
-| `herramientas/notas-vercel.md` | Por qué cada valor del despliegue es el que es |
 | `pruebas/` | Las pruebas: motor, base de datos y contrato de despliegue |
 | `.github/workflows/` | Integración continua: pruebas y ejecutables de escritorio |
 | `.github/dependabot.yml` | Avisos de versiones nuevas de Electron y de las acciones |
-| `vercel.json` | Construcción y cabeceras del sitio publicado |
-| `.vercelignore` | Qué no se sube al desplegar |
-| `DESPLIEGUE.md` | Qué pulsar para publicarlo y qué revisar después |
 
 ### Por qué existe `js/bloquitos.js`
 
@@ -192,11 +184,9 @@ Es un juego, pero no hay razón para que un juego sea descuidado.
 
 - **Cero dependencias en tiempo de ejecución.** No hay CDN ni peticiones
   externas. No existe cadena de suministro que comprometer.
-- **Política de contenido estricta.** Todo apunta a `'self'`: el juego solo puede
-  cargar archivos suyos y no puede abrir conexiones de red. Va por partida doble:
-  una etiqueta `<meta>` en `index.html`, que también cubre el doble clic, y la
-  cabecera de verdad que envía `vercel.json`, que además cierra `frame-ancestors`
-  —directiva que el navegador ignora cuando llega por `<meta>`—.
+- **Política de contenido estricta.** La etiqueta `<meta>` de `index.html`
+  limita los recursos al origen del juego y permite ejecutarlo al abrir el
+  archivo con doble clic.
 - **Sin `eval`, sin `innerHTML`.** Todo el texto que se muestra pasa por
   `textContent`, así que nunca se interpreta como HTML.
 - **Sin datos personales.** Solo números. No hay cuentas, ni analítica, ni
@@ -230,18 +220,13 @@ Las pruebas cubren la lógica pura —definición de piezas, tablas de pateo,
 distribución de la bolsa, colisiones, borrado de filas, curva de velocidad,
 puntuación, combos, condiciones de fin de partida y simulación de partidas
 completas—, toda la base de datos (guardado, orden, agregados, validación de
-datos corruptos, logros y borrado) y el contrato de despliegue: que `vercel.json`
-declare lo que tiene que declarar, que las rutas de `index.html` sigan siendo
-relativas y que todo lo enumerado por `archivos-cache.json` exista de verdad.
+datos corruptos, logros y borrado), las rutas relativas de `index.html` y la
+existencia de los archivos enumerados por `archivos-cache.json`.
 
 ## Publicar en la web
 
-Todo está decidido en `vercel.json` y `.vercelignore`, así que no hay nada que
-configurar a mano: Vercel lee esos archivos en cada despliegue y lo que digan
-manda sobre el panel. Los pasos —desde la web o desde la terminal—, las cinco
-comprobaciones posteriores y los problemas frecuentes están en
-**[DESPLIEGUE.md](DESPLIEGUE.md)**; el porqué de cada valor, en
-[`herramientas/notas-vercel.md`](herramientas/notas-vercel.md).
+GitHub Pages publica la raíz de la rama `main`. Incluye en el commit el
+paquete `js/bloquitos.js` regenerado cuando cambies los módulos del juego.
 
 Antes de publicar:
 

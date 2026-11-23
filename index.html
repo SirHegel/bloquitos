@@ -16,9 +16,6 @@
   debilita la version publicada: un documento servido por https jamas puede
   cargar un recurso file:, el navegador lo prohibe de todos modos.
 
-  frame-ancestors no aparece aqui a proposito: esa directiva se ignora cuando
-  llega por <meta>, asi que ponerla solo generaba un aviso en consola. El
-  encabezado real lo pone el servidor: la regla "/(.*)" de vercel.json.
 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: filesystem:; script-src 'self' file: filesystem:; style-src 'self' file: filesystem:; img-src 'self' data: file: filesystem:; font-src 'self' file:; connect-src 'self' file: filesystem:; media-src 'self' file:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
@@ -31,10 +28,8 @@
 <!--
   Tarjeta para redes sociales y aplicaciones de mensajeria.
 
-  La imagen va con ruta relativa porque la misma pagina se publica en tres sitios
-  con base distinta -- la raiz de un dominio de Vercel, la subcarpeta /bloquitos/
-  de GitHub Pages y el disco duro al abrirla con doble clic -- y una URL absoluta
-  solo seria correcta en uno de los tres.
+  La ruta relativa de la imagen funciona en la subcarpeta /bloquitos/ de
+  GitHub Pages y en el disco duro al abrir el archivo con doble clic.
 
   El precio hay que decirlo: Open Graph pide una URL absoluta. Slack, Discord y
   WhatsApp resuelven la relativa contra la direccion de la pagina y la tarjeta

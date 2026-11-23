@@ -16,7 +16,6 @@
   "private": true,
   "scripts": {
     "construir": "node herramientas/construir.mjs",
-    "vercel-build": "node herramientas/construir.mjs",
     "probar": "node --test",
     "verificar": "node herramientas/verificar-paquete.mjs",
     "servir": "node herramientas/construir.mjs && python3 -m http.server 8000",

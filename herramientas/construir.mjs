@@ -16,20 +16,13 @@
  *
  * Se ejecuta con:  node herramientas/construir.mjs
  *
- * TAMBIÉN ES EL COMANDO DE CONSTRUCCIÓN DE VERCEL
- *
- * `vercel.json` lo declara como `buildCommand`, de modo que Vercel lo ejecuta en
- * cada despliegue y decide por el código de salida si publica o cancela. El
- * contrato es estricto:
+ * Códigos de salida:
  *
  *   0 → js/bloquitos.js se ha escrito entero y se ha releído desde disco.
  *   1 → falta algún módulo del array ORDEN, ha quedado algún import/export
  *       suelto o no se ha podido escribir la salida. El motivo va por stderr.
  *
- * La diferencia importa porque un fallo silencioso aquí no rompe el despliegue:
- * lo publica a medias. La página cargaría, el jugador vería el tablero y ningún
- * botón respondería. Por eso cualquier problema termina en salida 1, y la
- * escritura es atómica: o queda el paquete completo, o queda el anterior.
+ * La escritura atómica conserva el paquete anterior si falla la compilación.
  */
 
 import { readFileSync, writeFileSync, statSync, renameSync, unlinkSync } from 'node:fs';
@@ -71,7 +64,7 @@ function quitarExports(codigo) {
   return codigo.replace(/^export\s+(?=(const|let|var|function|class|async)\b)/gm, '');
 }
 
-/** Aborta con un mensaje por stderr y código 1, el que Vercel lee como fallo. */
+/** Aborta con un mensaje por stderr y código 1. */
 function abortar(titulo, ...detalles) {
   console.error(`✗ ${titulo}`);
   detalles.forEach((linea) => console.error(linea ? `   ${linea}` : ''));
@@ -88,9 +81,7 @@ function kb(bytes) {
  *
  * Sin esta comprobación, un módulo renombrado hace que readFileSync lance una
  * excepción con traza de Node: sale con código 1, sí, pero el mensaje habla de
- * ENOENT y no de qué falta ni de dónde. En un registro de despliegue de Vercel
- * eso cuesta diez minutos de lectura. Aquí se revisan los nueve de golpe y se
- * dice exactamente cuáles faltan.
+ * ENOENT. Se revisan todos los módulos de una vez y se informa cuáles faltan.
  */
 function leerModulos() {
   const problemas = [];
